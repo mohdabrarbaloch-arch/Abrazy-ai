@@ -1,0 +1,4 @@
+"""Celery application entrypoint (imported by the worker process)."""
+from app.workers.tasks import celery_app
+
+__all__ = ["celery_app"]
