@@ -94,7 +94,7 @@ async def send_magic_link(body: dict, db: AsyncSession = Depends(get_db)):
     # Find or create user
     user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
     if not user:
-        # Auto-create user for magic link (like Teamily does)
+        # Auto-create user for magic link 
         user = User(
             email=email,
             hashed_password=hash_password(secrets.token_urlsafe(32)),  # Random password
@@ -231,3 +231,4 @@ async def oauth_callback(
     return RedirectResponse(
         url=f"{frontend_url}/auth/callback?provider={provider}&code={code}&access_token={tokens.access_token}"
     )
+

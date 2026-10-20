@@ -58,7 +58,7 @@ export default function LoginPage() {
       {/* Left side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-gradient-to-br from-[#00a884] via-[#00897b] to-[#00796b] p-12 flex-col justify-between text-white">
         <div>
-          <h1 className="text-4xl font-bold mb-4">Teamily AI Clone</h1>
+          <h1 className="text-4xl font-bold mb-4">Abrazy AI Platform</h1>
           <p className="text-xl opacity-90">Your AI team is one tap away</p>
         </div>
         <div className="space-y-6">
@@ -107,7 +107,7 @@ export default function LoginPage() {
           <div className="bg-white rounded-2xl shadow-xl p-8 space-y-6">
             {/* Logo for mobile */}
             <div className="lg:hidden text-center mb-4">
-              <h1 className="text-2xl font-bold text-[#00a884]">Teamily AI</h1>
+              <h1 className="text-2xl font-bold text-[#00a884]">Abrazy AI</h1>
             </div>
 
             {/* Tabs */}
@@ -302,3 +302,4 @@ export default function LoginPage() {
     </div>
   );
 }
+

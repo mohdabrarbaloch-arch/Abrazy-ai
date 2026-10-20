@@ -139,3 +139,51 @@ class ApiKeyCreated(BaseModel):
     label: str
     key: str  # full key, shown only once
     created_at: datetime
+
+
+# --- Conversation & Message ---
+class MessageCreate(BaseModel):
+    content: str
+    sender_type: str = "user"  # "user" | "agent" | "system"
+    sender_id: str | None = None
+    sender_name: str = ""
+    artifacts: dict | list | None = None
+
+
+class MessageOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    conversation_id: str
+    sender_type: str
+    sender_id: str | None = None
+    sender_name: str = ""
+    content: str
+    artifacts: dict | list | None = None
+    created_at: datetime
+
+
+class ConversationCreate(BaseModel):
+    title: str = "New Chat"
+    is_group: bool = False
+    agent_id: str | None = None
+    member_agent_ids: list[str] = Field(default_factory=list)
+
+
+class ConversationUpdate(BaseModel):
+    title: str | None = None
+    member_agent_ids: list[str] | None = None
+
+
+class ConversationOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: str
+    user_id: str | None = None
+    title: str
+    is_group: bool
+    agent_id: str | None = None
+    member_agent_ids: list = Field(default_factory=list)
+    created_at: datetime
+    updated_at: datetime
+    last_message: MessageOut | None = None
+    agent_avatar: str | None = None
+    agent_name: str | None = None

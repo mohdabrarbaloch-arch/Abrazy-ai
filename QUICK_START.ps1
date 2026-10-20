@@ -1,7 +1,7 @@
-# 🇵🇰 Teamily AI Pakistan - Quick Setup Script
+# 🇵🇰 abrazy AI Pakistan - Quick Setup Script
 
 Write-Host "================================================" -ForegroundColor Green
-Write-Host "   Teamily AI - Pakistan Version Setup" -ForegroundColor Green
+Write-Host "   abrazy AI - Pakistan Version Setup" -ForegroundColor Green
 Write-Host "================================================" -ForegroundColor Green
 Write-Host ""
 
@@ -99,5 +99,6 @@ Write-Host "  npm run dev" -ForegroundColor White
 Write-Host ""
 Write-Host "Then open: http://localhost:3000" -ForegroundColor Cyan
 Write-Host ""
-Write-Host "Read TEAMILY_PAKISTAN_SETUP.md for complete guide!" -ForegroundColor Green
+Write-Host "Read abrazy_PAKISTAN_SETUP.md for complete guide!" -ForegroundColor Green
 Write-Host ""
+

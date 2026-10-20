@@ -15,11 +15,14 @@ class Base(DeclarativeBase):
 
 engine = create_async_engine(settings.DATABASE_URL, echo=settings.DEBUG, pool_pre_ping=True)
 SessionLocal = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+async_session_maker = SessionLocal
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
     async with SessionLocal() as session:
         yield session
+
+get_session = get_db
 
 
 async def init_db() -> None:

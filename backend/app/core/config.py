@@ -44,13 +44,17 @@ class Settings(BaseSettings):
     RATE_LIMIT_PER_MINUTE: int = 60
 
     # --- LLM providers (Ollama is default / local, no key required) ---
-    LLM_PROVIDER: str = "ollama"  # ollama | openai | anthropic
+    LLM_PROVIDER: str = "ollama"  # ollama | openai | anthropic | groq | gemini
     OLLAMA_BASE_URL: str = "http://127.0.0.1:11434"
     OLLAMA_MODEL: str = "gemma3:4b"
     OPENAI_API_KEY: str | None = None
     OPENAI_MODEL: str = "gpt-4o-mini"
     ANTHROPIC_API_KEY: str | None = None
     ANTHROPIC_MODEL: str = "claude-3-5-haiku-latest"
+    GROQ_API_KEY: str | None = None
+    GROQ_MODEL: str = "llama-3.3-70b-versatile"
+    GEMINI_API_KEY: str | None = None
+    GEMINI_MODEL: str = "gemini-2.5-flash"
 
     # --- Integrations (OAuth secrets, env only) ---
     GMAIL_CLIENT_ID: str | None = None
@@ -75,7 +79,7 @@ class Settings(BaseSettings):
     BILLING_ENABLED: bool = False
 
     # --- CORS ---
-    CORS_ORIGINS: list[str] = ["http://localhost:3000"]
+    CORS_ORIGINS: list[str] | str = ["http://localhost:3000"]
 
     # --- Misc ---
     LOG_LEVEL: str = "INFO"

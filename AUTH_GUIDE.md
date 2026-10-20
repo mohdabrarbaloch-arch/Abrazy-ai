@@ -2,7 +2,7 @@
 
 ## Overview
 
-This authentication system is inspired by **Teamily AI** and provides multiple modern authentication methods:
+This authentication system is inspired by **abrazy.ai** and provides multiple modern authentication methods:
 
 - ✉️ **Email/Password** - Traditional authentication
 - 🔗 **Magic Links** - Passwordless authentication via email
@@ -318,7 +318,7 @@ Add new providers in `backend/app/api/routes/auth.py`:
 
 ## Resources
 
-- [Teamily AI](https://teamily.ai/) - Inspiration
+- [abrazy.ai](https://abrazy.ai/) - Inspiration
 - [FastAPI Security](https://fastapi.tiangolo.com/tutorial/security/)
 - [Next.js Auth](https://nextjs.org/docs/authentication)
 - [OAuth 2.0](https://oauth.net/2/)
@@ -326,3 +326,4 @@ Add new providers in `backend/app/api/routes/auth.py`:
 ---
 
 Built with ❤️ for modern authentication experiences.
+

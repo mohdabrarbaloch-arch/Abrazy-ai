@@ -50,6 +50,20 @@ async def get_current_user(
     return user
 
 
+async def get_optional_user(
+    request: Request,
+    creds: HTTPAuthorizationCredentials | None = Depends(bearer),
+    db: AsyncSession = Depends(get_db),
+) -> User | None:
+    """Allow unauthenticated access for public and demo interactions."""
+    try:
+        return await get_current_user(request, creds, db)
+    except Exception:
+        # Fallback to system or first available user in database
+        first_user = (await db.execute(select(User).limit(1))).scalar_one_or_none()
+        return first_user
+
+
 # --- Simple in-memory rate limiter (swap for redis in prod) ---
 class RateLimiter:
     def __init__(self, per_minute: int) -> None:

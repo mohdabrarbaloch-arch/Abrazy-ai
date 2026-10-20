@@ -92,7 +92,7 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div className="space-y-6">
               <div className="text-center mb-8">
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to Teamily AI! 👋</h1>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Welcome to Abrazy AI! 👋</h1>
                 <p className="text-gray-600">Let's personalize your experience. What best describes your role?</p>
               </div>
 
@@ -236,3 +236,4 @@ export default function OnboardingPage() {
     </div>
   );
 }
+

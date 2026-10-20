@@ -30,17 +30,17 @@ async def seed_official_agents():
             db.add(system_user)
             await db.commit()
             await db.refresh(system_user)
-            print("✓ Created system user")
+            print("[OK] Created system user")
 
         # Check if agents already exist
         result = await db.execute(select(Agent).where(Agent.is_official == True).limit(1))
         if result.scalar_one_or_none():
-            print("✓ Official agents already exist, skipping seed")
+            print("[OK] Official agents already exist, skipping seed")
             return
 
         agents_data = [
             # Marketing (50 agents)
-            {"name": "Influencer Scout", "avatar": "💄", "description": "Teamily's official ROI/Creator partnerships screening advisor. Based on influence data provided by the agen...", "category": "Marketing", "tags": ["influencer", "roi", "partnerships"]},
+            {"name": "Influencer Scout", "avatar": "💄", "description": "Abrazy AI's official ROI/Creator partnerships screening advisor. Based on influence data provided by the agen...", "category": "Marketing", "tags": ["influencer", "roi", "partnerships"]},
             {"name": "Brand & Social Media Agent", "avatar": "📱", "description": "Identify AI-driven business, content strategies, and Social Media Operating System — from idea to production t...", "category": "Marketing", "tags": ["brand", "social-media", "strategy"]},
             {"name": "SEO Specialist", "avatar": "🔍", "description": "Expert in search engine optimization, keyword research, and organic traffic growth strategies.", "category": "Marketing", "tags": ["seo", "keywords", "traffic"]},
             {"name": "Email Campaign Manager", "avatar": "📧", "description": "Design and optimize email campaigns with AI-powered segmentation and personalization.", "category": "Marketing", "tags": ["email", "campaigns", "automation"]},
@@ -74,7 +74,7 @@ async def seed_official_agents():
             {"name": "Fundraising Advisor", "avatar": "💎", "description": "Venture capital, angel investors, and startup fundraising strategies.", "category": "Finance", "tags": ["fundraising", "vc", "investors"]},
             
             # Design (35 agents)
-            {"name": "Visual Designer", "avatar": "🎨", "description": "Your skills don't work less design partner at Teamily AI. Skilled for design for web prototyping, design...", "category": "Design", "tags": ["ui-design", "prototyping", "branding"]},
+            {"name": "Visual Designer", "avatar": "🎨", "description": "Your skills don't work less design partner at Abrazy AI. Skilled for design for web prototyping, design...", "category": "Design", "tags": ["ui-design", "prototyping", "branding"]},
             {"name": "Product Designer", "avatar": "🖌️", "description": "Own the digital end-to-end product rapid-to-delivered specification. Delivers traceable, actionable, verifiable...", "category": "Design", "tags": ["product-design", "ux", "specifications"]},
             {"name": "UX Researcher", "avatar": "🔬", "description": "Conduct user research, analyze behavior patterns, and deliver actionable insights.", "category": "Design", "tags": ["ux", "research", "user-testing"]},
             {"name": "Brand Identity Designer", "avatar": "🎭", "description": "Logo design, brand guidelines, and visual identity systems.", "category": "Design", "tags": ["branding", "logo", "identity"]},
@@ -157,10 +157,10 @@ async def seed_official_agents():
             
             if (i + 1) % 50 == 0:
                 await db.commit()
-                print(f"  ✓ Created {i + 1} agents...")
+                print(f"  [OK] Created {i + 1} agents...")
 
         await db.commit()
-        print(f"\n✅ Successfully created {len(agents_data)} official agents!")
+        print(f"\n[OK] Successfully created {len(agents_data)} official agents!")
 
 
 async def seed_agent_teams():
@@ -172,7 +172,7 @@ async def seed_agent_teams():
         system_user = result.scalar_one_or_none()
         
         if not system_user:
-            print("⚠ System user not found, run seed_official_agents first")
+            print("[WARN] System user not found, run seed_official_agents first")
             return
 
         # Check if teams exist
@@ -261,7 +261,7 @@ async def seed_agent_teams():
             db.add(team)
 
         await db.commit()
-        print(f"✅ Successfully created {len(teams_data)} agent team templates!")
+        print(f"[OK] Successfully created {len(teams_data)} agent team templates!")
 
 
 async def main():
@@ -272,7 +272,7 @@ async def main():
     
     # Initialize database
     await init_db()
-    print("✓ Database initialized\n")
+    print("[OK] Database initialized\n")
     
     # Seed agents
     await seed_official_agents()
@@ -281,9 +281,10 @@ async def main():
     await seed_agent_teams()
     
     print("\n" + "=" * 60)
-    print("✅ Seeding complete!")
+    print("[OK] Seeding complete!")
     print("=" * 60)
 
 
 if __name__ == "__main__":
     asyncio.run(main())
+

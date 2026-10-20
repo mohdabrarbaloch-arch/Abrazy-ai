@@ -6,7 +6,7 @@
 [![Python](https://img.shields.io/badge/Python-3.11-3776AB.svg)](https://www.python.org)
 [![Tests](https://img.shields.io/badge/tests-12%2F12%20passing-brightgreen.svg)](#running-the-tests)
 
-A production-ready, **local-first** AI Agent Platform inspired by **[Teamily AI](https://teamily.ai/)**: create
+A production-ready, **local-first** AI Agent Platform inspired by **[abrazy.ai](https://abrazy.ai/)**: create
 AI agents, give them tasks across your tools (email, Slack, Notion, web, images),
 schedule automations with cron, and connect third-party services via OAuth.
 
@@ -20,7 +20,7 @@ schedule automations with cron, and connect third-party services via OAuth.
 
 ## Features
 
-### 🔐 Authentication (Teamily AI-Inspired)
+### 🔐 Authentication (abrazy.ai-Inspired)
 - **Multiple login methods** — Email/password, OAuth (Google, GitHub, Microsoft), magic links
 - **Modern UI/UX** — Split-screen design, beautiful onboarding flow
 - **Personalization** — Role-based onboarding, user preferences
@@ -171,3 +171,4 @@ pytest -q
 ## License
 
 [MIT](LICENSE) © 2026 AI Agent Platform contributors.
+

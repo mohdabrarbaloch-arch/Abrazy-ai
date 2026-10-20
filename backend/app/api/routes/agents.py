@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user, get_optional_user
 from app.core.db import get_db
 from app.models import Agent, AgentTeam, User
 from app.schemas import AgentCreate, AgentOut, AgentUpdate
@@ -15,15 +15,21 @@ router = APIRouter(prefix="/agents", tags=["agents"])
 
 @router.get("", response_model=list[AgentOut])
 async def list_agents(
-    user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
     db: AsyncSession = Depends(get_db),
     category: str | None = None,
     search: str | None = None,
     is_public: bool | None = None,
     is_official: bool | None = None,
 ):
-    """List agents with optional filters for marketplace"""
-    query = select(Agent).where(Agent.owner_id == user.id)
+    """List agents with optional filters for marketplace or custom created"""
+    query = select(Agent)
+    if is_official is not None:
+        query = query.where(Agent.is_official == is_official)
+    elif user:
+        query = query.where(or_(Agent.owner_id == user.id, Agent.is_official == False))
+    else:
+        query = query.where(Agent.is_official == False)
     
     # Apply filters
     if category:
@@ -37,8 +43,6 @@ async def list_agents(
         )
     if is_public is not None:
         query = query.where(Agent.is_public == is_public)
-    if is_official is not None:
-        query = query.where(Agent.is_official == is_official)
     
     query = query.order_by(Agent.created_at.desc())
     rows = (await db.execute(query)).scalars().all()
@@ -74,8 +78,16 @@ async def list_marketplace_agents(
 
 
 @router.post("", response_model=AgentOut, status_code=status.HTTP_201_CREATED)
-async def create_agent(body: AgentCreate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    agent = Agent(owner_id=user.id, **body.model_dump())
+async def create_agent(
+    body: AgentCreate,
+    user: User | None = Depends(get_optional_user),
+    db: AsyncSession = Depends(get_db)
+):
+    if not user:
+        user = (await db.execute(select(User).limit(1))).scalar_one_or_none()
+    
+    owner_id = user.id if user else "system_guest"
+    agent = Agent(owner_id=owner_id, **body.model_dump())
     db.add(agent)
     await db.commit()
     await db.refresh(agent)
@@ -83,16 +95,16 @@ async def create_agent(body: AgentCreate, user: User = Depends(get_current_user)
 
 
 @router.get("/{agent_id}", response_model=AgentOut)
-async def get_agent(agent_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    agent = (await db.execute(select(Agent).where(Agent.id == agent_id, Agent.owner_id == user.id))).scalar_one_or_none()
+async def get_agent(agent_id: str, user: User | None = Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
+    agent = (await db.execute(select(Agent).where(Agent.id == agent_id))).scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     return agent
 
 
 @router.patch("/{agent_id}", response_model=AgentOut)
-async def update_agent(agent_id: str, body: AgentUpdate, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    agent = (await db.execute(select(Agent).where(Agent.id == agent_id, Agent.owner_id == user.id))).scalar_one_or_none()
+async def update_agent(agent_id: str, body: AgentUpdate, user: User | None = Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
+    agent = (await db.execute(select(Agent).where(Agent.id == agent_id))).scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     for k, v in body.model_dump(exclude_unset=True).items():
@@ -103,8 +115,8 @@ async def update_agent(agent_id: str, body: AgentUpdate, user: User = Depends(ge
 
 
 @router.delete("/{agent_id}", status_code=status.HTTP_204_NO_CONTENT)
-async def delete_agent(agent_id: str, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    agent = (await db.execute(select(Agent).where(Agent.id == agent_id, Agent.owner_id == user.id))).scalar_one_or_none()
+async def delete_agent(agent_id: str, user: User | None = Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
+    agent = (await db.execute(select(Agent).where(Agent.id == agent_id))).scalar_one_or_none()
     if not agent:
         raise HTTPException(status_code=404, detail="Agent not found")
     await db.delete(agent)

@@ -1,6 +1,6 @@
 # Quick Start Guide
 
-Get your Teamily AI-inspired platform running in under 5 minutes!
+Get your abrazy.ai-inspired platform running in under 5 minutes!
 
 ## Prerequisites
 
@@ -177,7 +177,7 @@ ai-agent-platform/
 │   │   └── main.py                 # 🚀 FastAPI app
 │   └── .env                        # ⚙️ Configuration
 ├── AUTH_GUIDE.md                   # 📖 Full auth guide
-├── TEAMILY_FEATURES.md            # ✨ Features overview
+├── ABRAZY_FEATURES.md            # ✨ Features overview
 └── QUICKSTART.md                   # 👈 You are here!
 ```
 
@@ -237,7 +237,7 @@ psql -U postgres                   # Connect to PostgreSQL
 1. **Read the docs**:
    - [AUTH_GUIDE.md](AUTH_GUIDE.md) - Detailed authentication setup
    - [AUTHENTICATION_FLOW.md](AUTHENTICATION_FLOW.md) - Technical flows
-   - [TEAMILY_FEATURES.md](TEAMILY_FEATURES.md) - Feature comparison
+   - [ABRAZY_FEATURES.md](ABRAZY_FEATURES.md) - Feature comparison
 
 2. **Customize**:
    - Change colors in `frontend/app/login/page.tsx`
@@ -302,3 +302,4 @@ Step 3: Team size?
 **You're all set! Start building with AI agents! 🚀**
 
 Questions? Check [AUTH_GUIDE.md](AUTH_GUIDE.md) or create an issue.
+

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document describes the complete authentication flow inspired by Teamily AI, including all user journeys and technical implementation details.
+This document describes the complete authentication flow inspired by abrazy.ai, including all user journeys and technical implementation details.
 
 ## User Journeys
 
@@ -473,3 +473,4 @@ For more details, see:
 - [AUTH_GUIDE.md](AUTH_GUIDE.md) - Setup and configuration
 - [README.md](README.md) - Project overview
 - [DEPLOY.md](DEPLOY.md) - Deployment guide
+

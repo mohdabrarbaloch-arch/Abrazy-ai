@@ -1,10 +1,10 @@
-# 🇵🇰 Teamily AI - Pakistan Version
+# 🇵🇰 abrazy.ai - Pakistan Version
 
 **Aapka Pakistani AI Agent Platform!**
 
 ## Kya Hai Yeh?
 
-Bilkul [Teamily.ai](https://teamily.ai) jaisa modern AI chat platform - lekin **Pakistani context** ke saath!
+Bilkul [abrazy.ai](https://abrazy.ai) jaisa modern AI chat platform - lekin **Pakistani context** ke saath!
 
 ### ✨ Features
 
@@ -67,10 +67,10 @@ Business strategy aur growth advisor
 
 ## 📚 Complete Documentation
 
-Detailed guide: **[TEAMILY_PAKISTAN_SETUP.md](TEAMILY_PAKISTAN_SETUP.md)**
+Detailed guide: **[ABRAZY_PAKISTAN_SETUP.md](ABRAZY_PAKISTAN_SETUP.md)**
 
 ### Quick Links:
-- **Setup Guide** → TEAMILY_PAKISTAN_SETUP.md
+- **Setup Guide** → ABRAZY_PAKISTAN_SETUP.md
 - **API Docs** → http://localhost:8000/docs
 - **Database Info** → See setup guide
 - **Deployment** → See setup guide
@@ -225,7 +225,7 @@ Perfect for Pakistani market:
 
 Issues? Questions?
 
-1. Read **TEAMILY_PAKISTAN_SETUP.md**
+1. Read **ABRAZY_PAKISTAN_SETUP.md**
 2. Check **troubleshooting** section
 3. Open GitHub issue
 
@@ -250,3 +250,4 @@ http://localhost:3000
 ---
 
 Built with ❤️ in Pakistan
+

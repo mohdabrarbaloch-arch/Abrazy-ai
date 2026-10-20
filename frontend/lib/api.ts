@@ -47,8 +47,23 @@ export const api = {
     headers: { "Content-Type": "application/json", Authorization: `Bearer ${token()}` },
     body: JSON.stringify(b),
   }),
+  // conversations
+  listConversations: () => req<any[]>("/api/conversations"),
+  createConversation: (b: { title?: string; is_group?: boolean; agent_id?: string; member_agent_ids?: string[] }) => req<any>("/api/conversations", { method: "POST", body: JSON.stringify(b) }),
+  getConversation: (id: string) => req<any>(`/api/conversations/${id}`),
+  deleteConversation: (id: string) => req(`/api/conversations/${id}`, { method: "DELETE" }),
+  listMessages: (conversationId: string) => req<any[]>(`/api/conversations/${conversationId}/messages`),
+  createMessage: (conversationId: string, b: { content: string; sender_type?: string; sender_id?: string; sender_name?: string }) => req<any>(`/api/conversations/${conversationId}/messages`, { method: "POST", body: JSON.stringify(b) }),
   // models
   models: () => req<{ default: string; models: any[] }>("/api/models"),
+  // automations
+  listAutomations: (category?: string) => req<any[]>(`/api/automations${category ? `?category=${category}` : ""}`),
+  createAutomation: (b: any) => req<any>("/api/automations", { method: "POST", body: JSON.stringify(b) }),
+  toggleAutomation: (id: string) => req<any>(`/api/automations/${id}/toggle`, { method: "PATCH" }),
+  runAutomation: (id: string) => req<any>(`/api/automations/${id}/run`, { method: "POST" }),
+  deleteAutomation: (id: string) => req(`/api/automations/${id}`, { method: "DELETE" }),
+  // feed
+  getFeed: (filter?: string) => req<any[]>(`/api/feed${filter ? `?filter_type=${filter}` : ""}`),
   // ws
   ws: (taskId: string) => {
     const proto = API_URL.startsWith("https") ? "wss" : "ws";

@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "abrazy-ai": {
+      "command": "python",
+      "args": [
+        "c:/Users/SMIT 123/Desktop/ai-agent-platform/backend/mcp_server.py"
+      ],
+      "env": {
+        "PYTHONPATH": "c:/Users/SMIT 123/Desktop/ai-agent-platform/backend"
+      }
+    }
+  }
+}
