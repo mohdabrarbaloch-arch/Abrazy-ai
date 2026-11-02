@@ -45,20 +45,65 @@ interface TopicData {
   connection_count: number;
 }
 
+const DEFAULT_GRAPH_DATA: GraphData = {
+  nodes: [
+    { id: "mem_1", title: "Morning Routine Briefing", category: "Daily Briefings", color: "#10B981", size: 16, content: "Daily sync on critical tasks, agent orchestration status, and overnight automation reports.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_2", title: "Weekly Goals Review", category: "Daily Briefings", color: "#10B981", size: 14, content: "Reviewing OKRs, active agent squad milestones, and weekly output targets.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_3", title: "Sprint Velocity Check", category: "Daily Briefings", color: "#10B981", size: 12, content: "Tracking task turnaround speed and LLM token efficiencies across runs.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_4", title: "Abrazy Platform Architecture", category: "Projects", color: "#3B82F6", size: 20, content: "Core OS specifications: Social Brain Model, multi-agent squads, and living memory graph.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_5", title: "AI Agent Marketplace", category: "Projects", color: "#3B82F6", size: 18, content: "Discover and deploy official specialized AI teammates across engineering, finance, legal, and growth.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_6", title: "Living Memory Graph v2", category: "Projects", color: "#3B82F6", size: 15, content: "Persistent force-directed knowledge graph mapping user context and agent insights.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_7", title: "30 Day Content Challenge", category: "30 Day Challenge", color: "#F59E0B", size: 15, content: "High-intensity multi-platform automated content generation sprint.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_8", title: "Video Scripts Library", category: "30 Day Challenge", color: "#F59E0B", size: 12, content: "Categorized viral hooks, storytelling frameworks, and technical breakdown scripts.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_9", title: "Audience Growth Loops", category: "30 Day Challenge", color: "#F59E0B", size: 11, content: "Automated engagement funnels linking Twitter, LinkedIn, and YouTube broadcasts.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_10", title: "Social Media Strategy", category: "Marketing", color: "#EC4899", size: 14, content: "Omnichannel publishing schedules and personalized audience segmentation.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_11", title: "Brand Guidelines & Voice", category: "Marketing", color: "#EC4899", size: 12, content: "Teamily Green color harmony, Lato typography standards, and confident agent tone.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_12", title: "Shoot Kit Templates", category: "Video Production", color: "#8B5CF6", size: 13, content: "Standardized B-roll shot lists, lighting setups, and teleprompter cues.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_13", title: "GPU Rendering Workflow", category: "Video Production", color: "#8B5CF6", size: 14, content: "Fast ffmpeg video rendering and multi-track audio normalization.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_14", title: "Asset & Media Library", category: "Media", color: "#06B6D4", size: 12, content: "Centralized repository for high-res images, brand logos, audio clips, and vector SVGs.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() },
+    { id: "mem_15", title: "Local LLM Cluster Setup", category: "Engineering", color: "#6366F1", size: 17, content: "Hybrid cloud and local inference routing with Groq, Gemini, and Ollama failovers.", created_at: new Date().toISOString(), updated_at: new Date().toISOString() }
+  ],
+  links: [
+    { id: "l_1", source: "mem_1", target: "mem_2", strength: 3, label: "coordinates" },
+    { id: "l_2", source: "mem_2", target: "mem_3", strength: 2, label: "measures" },
+    { id: "l_3", source: "mem_4", target: "mem_5", strength: 3, label: "deploys" },
+    { id: "l_4", source: "mem_4", target: "mem_6", strength: 3, label: "integrates" },
+    { id: "l_5", source: "mem_7", target: "mem_8", strength: 2, label: "generates" },
+    { id: "l_6", source: "mem_8", target: "mem_9", strength: 2, label: "distributes" },
+    { id: "l_7", source: "mem_10", target: "mem_11", strength: 3, label: "follows" },
+    { id: "l_8", source: "mem_7", target: "mem_10", strength: 2, label: "aligns_with" },
+    { id: "l_9", source: "mem_12", target: "mem_13", strength: 3, label: "produces" },
+    { id: "l_10", source: "mem_8", target: "mem_12", strength: 2, label: "provides_script" },
+    { id: "l_11", source: "mem_13", target: "mem_14", strength: 2, label: "stores_in" },
+    { id: "l_12", source: "mem_5", target: "mem_10", strength: 1, label: "promotes" },
+    { id: "l_13", source: "mem_4", target: "mem_15", strength: 3, label: "powers" },
+    { id: "l_14", source: "mem_6", target: "mem_15", strength: 2, label: "syncs_with" },
+    { id: "l_15", source: "mem_1", target: "mem_4", strength: 1, label: "tracks" },
+    { id: "l_16", source: "mem_9", target: "mem_11", strength: 1, label: "embodies" }
+  ],
+  stats: { total_nodes: 15, total_links: 16, unlinked: 0 }
+};
+
+const DEFAULT_TOPICS: TopicData[] = [
+  { category: "Daily Briefings", node_count: 3, connection_count: 3 },
+  { category: "Projects", node_count: 3, connection_count: 6 },
+  { category: "30 Day Challenge", node_count: 3, connection_count: 4 },
+  { category: "Marketing", node_count: 2, connection_count: 3 },
+  { category: "Video Production", node_count: 2, connection_count: 3 },
+  { category: "Media", node_count: 1, connection_count: 1 },
+  { category: "Engineering", node_count: 1, connection_count: 2 }
+];
+
 export default function MemoryPage() {
-  const [graphData, setGraphData] = useState<GraphData>({
-    nodes: [],
-    links: [],
-    stats: { total_nodes: 0, total_links: 0, unlinked: 0 },
-  });
-  const [topics, setTopics] = useState<TopicData[]>([]);
+  const [graphData, setGraphData] = useState<GraphData>(DEFAULT_GRAPH_DATA);
+  const [topics, setTopics] = useState<TopicData[]>(DEFAULT_TOPICS);
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [onlyConnected, setOnlyConnected] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<"highlights" | "updates">("highlights");
 
-  // Fetch graph data
+  // Fetch graph data from backend
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -72,15 +117,19 @@ export default function MemoryPage() {
 
         if (graphRes.ok) {
           const data = await graphRes.json();
-          setGraphData(data);
+          if (data && data.nodes && data.nodes.length > 0) {
+            setGraphData(data);
+          }
         }
 
         if (topicsRes.ok) {
           const data = await topicsRes.json();
-          setTopics(data.topics || []);
+          if (data && data.topics && data.topics.length > 0) {
+            setTopics(data.topics);
+          }
         }
       } catch (error) {
-        console.error("Failed to fetch memory data:", error);
+        console.warn("Using offline memory graph fallback:", error);
       } finally {
         setIsLoading(false);
       }

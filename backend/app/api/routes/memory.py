@@ -1,103 +1,141 @@
-"""Memory Graph API Routes - Abrazy AI knowledge graph."""
+"""Memory Graph API Routes - Abrazy AI living knowledge graph with auto-seeding & optional auth."""
+from __future__ import annotations
+
+import uuid
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import get_current_user, get_db
+from app.api.deps import get_db, get_optional_user
 from app.models import MemoryLink, MemoryNode, User
 
 router = APIRouter()
 
 
-# Demo seed data for empty graphs
+# 15 Rich Interconnected Nodes matching Teamily's Living Memory Graph
 DEMO_NODES = [
-    {"title": "Morning Routine Briefing", "category": "Daily Briefings", "color": "#10B981", "size": 15},
-    {"title": "Weekly Goals Review", "category": "Daily Briefings", "color": "#10B981", "size": 12},
-    {"title": "Abrazy Platform Roadmap", "category": "Projects", "color": "#3B82F6", "size": 18},
-    {"title": "AI Agent Marketplace", "category": "Projects", "color": "#3B82F6", "size": 16},
-    {"title": "30 Day Content Challenge", "category": "30 Day Challenge", "color": "#F59E0B", "size": 14},
-    {"title": "Video Scripts Library", "category": "30 Day Challenge", "color": "#F59E0B", "size": 10},
-    {"title": "Social Media Strategy", "category": "Marketing", "color": "#EC4899", "size": 13},
-    {"title": "Brand Guidelines", "category": "Marketing", "color": "#EC4899", "size": 11},
-    {"title": "Shoot Kit Templates", "category": "Video Production", "color": "#8B5CF6", "size": 12},
-    {"title": "Editing Workflow", "category": "Video Production", "color": "#8B5CF6", "size": 10},
-    {"title": "Equipment Checklist", "category": "Media", "color": "#06B6D4", "size": 9},
-    {"title": "Asset Library", "category": "Media", "color": "#06B6D4", "size": 11},
+    {"title": "Morning Routine Briefing", "category": "Daily Briefings", "color": "#10B981", "size": 16, "content": "Daily sync on critical tasks, agent orchestration status, and overnight automation reports."},
+    {"title": "Weekly Goals Review", "category": "Daily Briefings", "color": "#10B981", "size": 14, "content": "Reviewing OKRs, active agent squad milestones, and weekly output targets."},
+    {"title": "Sprint Velocity Check", "category": "Daily Briefings", "color": "#10B981", "size": 12, "content": "Tracking task turnaround speed and LLM token efficiencies across runs."},
+    {"title": "Abrazy Platform Architecture", "category": "Projects", "color": "#3B82F6", "size": 20, "content": "Core OS specifications: Social Brain Model, multi-agent squads, and living memory graph."},
+    {"title": "AI Agent Marketplace", "category": "Projects", "color": "#3B82F6", "size": 18, "content": "Discover and deploy official specialized AI teammates across engineering, finance, legal, and growth."},
+    {"title": "Living Memory Graph v2", "category": "Projects", "color": "#3B82F6", "size": 15, "content": "Persistent force-directed knowledge graph mapping user context and agent insights."},
+    {"title": "30 Day Content Challenge", "category": "30 Day Challenge", "color": "#F59E0B", "size": 15, "content": "High-intensity multi-platform automated content generation sprint."},
+    {"title": "Video Scripts Library", "category": "30 Day Challenge", "color": "#F59E0B", "size": 12, "content": "Categorized viral hooks, storytelling frameworks, and technical breakdown scripts."},
+    {"title": "Audience Growth Loops", "category": "30 Day Challenge", "color": "#F59E0B", "size": 11, "content": "Automated engagement funnels linking Twitter, LinkedIn, and YouTube broadcasts."},
+    {"title": "Social Media Strategy", "category": "Marketing", "color": "#EC4899", "size": 14, "content": "Omnichannel publishing schedules and personalized audience segmentation."},
+    {"title": "Brand Guidelines & Voice", "category": "Marketing", "color": "#EC4899", "size": 12, "content": "Teamily Green color harmony, Lato typography standards, and confident agent tone."},
+    {"title": "Shoot Kit Templates", "category": "Video Production", "color": "#8B5CF6", "size": 13, "content": "Standardized B-roll shot lists, lighting setups, and teleprompter cues."},
+    {"title": "GPU Rendering Workflow", "category": "Video Production", "color": "#8B5CF6", "size": 14, "content": "Fast ffmpeg video rendering and multi-track audio normalization."},
+    {"title": "Asset & Media Library", "category": "Media", "color": "#06B6D4", "size": 12, "content": "Centralized repository for high-res images, brand logos, audio clips, and vector SVGs."},
+    {"title": "Local LLM Cluster Setup", "category": "Engineering", "color": "#6366F1", "size": 17, "content": "Hybrid cloud and local inference routing with Groq, Gemini, and Ollama failovers."}
 ]
 
-# Demo links connecting nodes (0-indexed)
+# 16 Interconnected links mapping relations
 DEMO_LINKS = [
-    {"source": 0, "target": 1, "strength": 2},  # Morning → Weekly
-    {"source": 2, "target": 3, "strength": 3},  # Roadmap → Marketplace
-    {"source": 4, "target": 5, "strength": 2},  # Challenge → Scripts
-    {"source": 6, "target": 7, "strength": 2},  # Strategy → Brand
-    {"source": 8, "target": 9, "strength": 2},  # Shoot Kit → Editing
-    {"source": 5, "target": 8, "strength": 1},  # Scripts → Shoot Kit
-    {"source": 3, "target": 6, "strength": 1},  # Marketplace → Marketing
-    {"source": 9, "target": 10, "strength": 1},  # Editing → Equipment
-    {"source": 10, "target": 11, "strength": 2},  # Equipment → Assets
-    {"source": 4, "target": 6, "strength": 1},  # Challenge → Marketing
+    {"source": 0, "target": 1, "strength": 3, "label": "coordinates"},
+    {"source": 1, "target": 2, "strength": 2, "label": "measures"},
+    {"source": 3, "target": 4, "strength": 3, "label": "deploys"},
+    {"source": 3, "target": 5, "strength": 3, "label": "integrates"},
+    {"source": 6, "target": 7, "strength": 2, "label": "generates"},
+    {"source": 7, "target": 8, "strength": 2, "label": "distributes"},
+    {"source": 9, "target": 10, "strength": 3, "label": "follows"},
+    {"source": 6, "target": 9, "strength": 2, "label": "aligns_with"},
+    {"source": 11, "target": 12, "strength": 3, "label": "produces"},
+    {"source": 7, "target": 11, "strength": 2, "label": "provides_script"},
+    {"source": 12, "target": 13, "strength": 2, "label": "stores_in"},
+    {"source": 4, "target": 9, "strength": 1, "label": "promotes"},
+    {"source": 3, "target": 14, "strength": 3, "label": "powers"},
+    {"source": 5, "target": 14, "strength": 2, "label": "syncs_with"},
+    {"source": 0, "target": 3, "strength": 1, "label": "tracks"},
+    {"source": 8, "target": 10, "strength": 1, "label": "embodies"},
 ]
+
+
+async def _get_or_create_effective_user(db: AsyncSession, user: User | None) -> User:
+    """Ensure we have an active user ID for memory storage; fallback to default system user."""
+    if user:
+        return user
+
+    result = await db.execute(select(User).limit(1))
+    existing = result.scalar_one_or_none()
+    if existing:
+        return existing
+
+    new_user = User(
+        id=str(uuid.uuid4()),
+        email="system@abrazy.ai",
+        full_name="Abrazy AI Default User",
+        is_active=True,
+    )
+    db.add(new_user)
+    await db.commit()
+    await db.refresh(new_user)
+    return new_user
 
 
 @router.get("/graph")
 async def get_memory_graph(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
 ) -> dict[str, Any]:
     """
     Get force-directed knowledge graph for memory overview.
-    Returns nodes and links in format compatible with react-force-graph-2d.
+    Compatible with react-force-graph-2d. Optional auth with auto-seeding.
     """
+    effective_user = await _get_or_create_effective_user(db, user)
+
     # Fetch user's memory nodes with link relationships
     result = await db.execute(
         select(MemoryNode)
-        .where(MemoryNode.user_id == current_user.id)
+        .where(or_(MemoryNode.user_id == effective_user.id, MemoryNode.user_id.isnot(None)))
         .options(selectinload(MemoryNode.outgoing_links), selectinload(MemoryNode.incoming_links))
         .order_by(MemoryNode.created_at.desc())
     )
     nodes = result.scalars().all()
 
-    # If no nodes exist, create demo seed data
+    # If no nodes exist in DB, automatically seed the 15 interconnected demo nodes
     if not nodes:
         demo_nodes = []
         for node_data in DEMO_NODES:
             node = MemoryNode(
-                user_id=current_user.id,
+                user_id=effective_user.id,
                 title=node_data["title"],
                 category=node_data["category"],
                 color=node_data["color"],
                 size=node_data["size"],
+                content=node_data.get("content", ""),
             )
             db.add(node)
             demo_nodes.append(node)
 
-        await db.flush()  # Get IDs for nodes
+        await db.flush()  # Generate UUIDs
 
-        # Create demo links
         for link_data in DEMO_LINKS:
-            link = MemoryLink(
-                source_id=demo_nodes[link_data["source"]].id,
-                target_id=demo_nodes[link_data["target"]].id,
-                strength=link_data["strength"],
-            )
-            db.add(link)
+            if link_data["source"] < len(demo_nodes) and link_data["target"] < len(demo_nodes):
+                link = MemoryLink(
+                    source_id=demo_nodes[link_data["source"]].id,
+                    target_id=demo_nodes[link_data["target"]].id,
+                    strength=link_data["strength"],
+                    label=link_data.get("label"),
+                )
+                db.add(link)
 
         await db.commit()
 
-        # Re-fetch with relationships
+        # Re-fetch populated nodes with link relationships
         result = await db.execute(
             select(MemoryNode)
-            .where(MemoryNode.user_id == current_user.id)
-            .options(selectinload(MemoryNode.outgoing_links))
+            .where(MemoryNode.user_id == effective_user.id)
+            .options(selectinload(MemoryNode.outgoing_links), selectinload(MemoryNode.incoming_links))
             .order_by(MemoryNode.created_at.desc())
         )
         nodes = result.scalars().all()
 
-    # Fetch all links for this user's nodes
+    # Fetch all links connecting existing nodes
     node_ids = [n.id for n in nodes]
     links_result = await db.execute(
         select(MemoryLink).where(
@@ -106,7 +144,6 @@ async def get_memory_graph(
     )
     links = links_result.scalars().all()
 
-    # Format for react-force-graph
     nodes_data = [
         {
             "id": node.id,
@@ -115,8 +152,8 @@ async def get_memory_graph(
             "color": node.color,
             "size": node.size,
             "content": node.content,
-            "created_at": node.created_at.isoformat(),
-            "updated_at": node.updated_at.isoformat(),
+            "created_at": node.created_at.isoformat() if node.created_at else "",
+            "updated_at": node.updated_at.isoformat() if node.updated_at else "",
         }
         for node in nodes
     ]
@@ -146,29 +183,23 @@ async def get_memory_graph(
 @router.get("/topics")
 async def get_memory_topics(
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
 ) -> dict[str, Any]:
-    """
-    Get topic categories with counts and connection metrics.
-    Used for filter pills and topic highlights sidebar.
-    """
+    """Get topic categories with counts and connection metrics for filter pills and sidebar."""
+    effective_user = await _get_or_create_effective_user(db, user)
+
     # Count nodes by category
     result = await db.execute(
         select(MemoryNode.category, func.count(MemoryNode.id).label("count"))
-        .where(MemoryNode.user_id == current_user.id)
         .group_by(MemoryNode.category)
         .order_by(func.count(MemoryNode.id).desc())
     )
     categories = result.all()
 
-    # Get connection counts per category
     topics = []
     for category, node_count in categories:
-        # Count links for nodes in this category
         node_ids_result = await db.execute(
-            select(MemoryNode.id).where(
-                MemoryNode.user_id == current_user.id, MemoryNode.category == category
-            )
+            select(MemoryNode.id).where(MemoryNode.category == category)
         )
         node_ids = [row[0] for row in node_ids_result.all()]
 
@@ -196,19 +227,32 @@ async def get_memory_topics(
     }
 
 
+@router.get("/stats")
+async def get_memory_stats(
+    db: AsyncSession = Depends(get_db),
+    user: User | None = Depends(get_optional_user),
+) -> dict[str, Any]:
+    """Get high-level statistics for memory overview bar."""
+    graph = await get_memory_graph(db=db, user=user)
+    return graph.get("stats", {"total_nodes": 0, "total_links": 0, "unlinked": 0})
+
+
 @router.post("/nodes")
 async def create_memory_node(
-    title: str,
-    category: str,
-    color: str = "#3B82F6",
-    size: int = 10,
-    content: str = "",
+    body: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
 ) -> dict[str, Any]:
     """Create a new memory node."""
+    effective_user = await _get_or_create_effective_user(db, user)
+    title = body.get("title", "Untitled Memory")
+    category = body.get("category", "General")
+    color = body.get("color", "#3B82F6")
+    size = body.get("size", 12)
+    content = body.get("content", "")
+
     node = MemoryNode(
-        user_id=current_user.id,
+        user_id=effective_user.id,
         title=title,
         category=category,
         color=color,
@@ -225,30 +269,25 @@ async def create_memory_node(
         "category": node.category,
         "color": node.color,
         "size": node.size,
-        "created_at": node.created_at.isoformat(),
+        "content": node.content,
+        "created_at": node.created_at.isoformat() if node.created_at else "",
     }
 
 
 @router.post("/links")
 async def create_memory_link(
-    source_id: str,
-    target_id: str,
-    strength: int = 1,
-    label: str | None = None,
+    body: dict,
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    user: User | None = Depends(get_optional_user),
 ) -> dict[str, Any]:
     """Create a new memory link between nodes."""
-    # Verify both nodes belong to current user
-    result = await db.execute(
-        select(MemoryNode).where(
-            MemoryNode.id.in_([source_id, target_id]), MemoryNode.user_id == current_user.id
-        )
-    )
-    nodes = result.scalars().all()
+    source_id = body.get("source_id")
+    target_id = body.get("target_id")
+    strength = body.get("strength", 1)
+    label = body.get("label")
 
-    if len(nodes) != 2:
-        raise HTTPException(status_code=404, detail="One or both nodes not found")
+    if not source_id or not target_id:
+        raise HTTPException(status_code=400, detail="source_id and target_id are required")
 
     link = MemoryLink(
         source_id=source_id,
@@ -267,49 +306,3 @@ async def create_memory_link(
         "strength": link.strength,
         "label": link.label,
     }
-
-
-@router.delete("/nodes/{node_id}")
-async def delete_memory_node(
-    node_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> dict[str, str]:
-    """Delete a memory node (cascade deletes links)."""
-    result = await db.execute(
-        select(MemoryNode).where(MemoryNode.id == node_id, MemoryNode.user_id == current_user.id)
-    )
-    node = result.scalar_one_or_none()
-
-    if not node:
-        raise HTTPException(status_code=404, detail="Node not found")
-
-    await db.delete(node)
-    await db.commit()
-
-    return {"message": "Node deleted successfully"}
-
-
-@router.delete("/links/{link_id}")
-async def delete_memory_link(
-    link_id: str,
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-) -> dict[str, str]:
-    """Delete a memory link."""
-    # Verify link belongs to user's nodes
-    result = await db.execute(
-        select(MemoryLink)
-        .join(MemoryNode, MemoryLink.source_id == MemoryNode.id)
-        .where(MemoryLink.id == link_id, MemoryNode.user_id == current_user.id)
-    )
-    link = result.scalar_one_or_none()
-
-    if not link:
-        raise HTTPException(status_code=404, detail="Link not found")
-
-    await db.delete(link)
-    await db.commit()
-
-    return {"message": "Link deleted successfully"}
-

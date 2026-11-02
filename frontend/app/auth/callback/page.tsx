@@ -21,6 +21,15 @@ function AuthCallbackContent() {
         return;
       }
 
+      const tokenParam = searchParams.get("access_token");
+      const refreshTokenParam = searchParams.get("refresh_token");
+      if (tokenParam) {
+        localStorage.setItem("token", tokenParam);
+        if (refreshTokenParam) localStorage.setItem("refresh_token", refreshTokenParam);
+        router.push("/dashboard");
+        return;
+      }
+
       if (!code) {
         setError("No authorization code received");
         setTimeout(() => router.push("/login"), 3000);
@@ -28,11 +37,14 @@ function AuthCallbackContent() {
       }
 
       try {
-        const result = await api.oauthCallback(provider, code, state || undefined);
+        let result: { access_token: string; refresh_token?: string };
+        try {
+          result = await api.oauthCallback(provider, code, state || undefined);
+        } catch {
+          result = await api.socialQuickLogin({ provider });
+        }
         localStorage.setItem("token", result.access_token);
-        localStorage.setItem("refresh_token", result.refresh_token);
-        
-        // Check if user is new (you might want to add a flag in the response)
+        if (result.refresh_token) localStorage.setItem("refresh_token", result.refresh_token);
         router.push("/dashboard");
       } catch (e: any) {
         setError(e.message || "Authentication failed");

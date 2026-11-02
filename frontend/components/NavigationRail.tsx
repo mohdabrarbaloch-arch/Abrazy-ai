@@ -12,13 +12,13 @@ export default function NavigationRail() {
   return (
     <>
       <aside className="w-16 h-screen bg-white border-r border-slate-200/90 flex flex-col items-center py-3 select-none z-30 flex-shrink-0">
-        {/* 1. Brand Logo (Teamily Green Circle with stylized monogram) */}
-        <Link className="mb-4" href="/chat">
+        {/* 1. Brand Logo (Abrazy Green Circle with stylized 'A' monogram) */}
+        <Link className="mb-4" href="/chat" title="Abrazy AI">
           <div className="w-10 h-10 rounded-full bg-[#00D35A] hover:bg-[#00be51] flex items-center justify-center text-white font-extrabold shadow-sm transition-transform active:scale-95">
-            {/* Teamily 'tp' stylized monogram mark */}
-            <svg className="w-6 h-6 fill-current" viewBox="0 0 24 24">
-              <path d="M7 6h10v3H14v9h-3V9H7V6zm9 4a3.5 3.5 0 0 1 3.5 3.5V17a3.5 3.5 0 0 1-3.5 3.5H14v-2.5h2a1.5 1.5 0 0 0 1.5-1.5v-3A1.5 1.5 0 0 0 16 12v-2z" />
-            </svg>
+            {/* Abrazy stylized 'A' mark */}
+            <span className="text-xl font-black tracking-tighter text-white select-none">
+              A
+            </span>
           </div>
         </Link>
 

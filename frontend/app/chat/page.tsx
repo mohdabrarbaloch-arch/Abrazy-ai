@@ -97,6 +97,7 @@ function ChatPageContent() {
       type: "agent",
       name: "ABraz Baloch's Personal AI",
       avatar: "🤖",
+      avatarImage: "https://api.dicebear.com/7.x/bottts/svg?seed=AbrazAI&backgroundColor=d1fae5",
       lastMessage: "Hello! How can I assist you with your project today?",
       timestamp: "15:46",
       status: "online",
@@ -106,8 +107,9 @@ function ChatPageContent() {
       id: "2",
       type: "agent",
       name: "Content Creator",
-      avatar: "🤖",
+      avatar: "🎨",
       avatarBg: "bg-amber-100 text-amber-800",
+      avatarImage: "https://api.dicebear.com/7.x/adventurer/svg?seed=ContentCreator&backgroundColor=fef3c7",
       lastMessage: "Repo cloned (it's public - ...",
       hasCheckmark: true,
       timestamp: "Tue",
@@ -130,6 +132,7 @@ function ChatPageContent() {
       name: "muhammad...",
       avatar: "M",
       avatarBg: "bg-[#5850A2] text-white",
+      avatarImage: "https://api.dicebear.com/7.x/notionists/svg?seed=Muhammad&backgroundColor=e0e7ff",
       lastMessage: "https://youtu.be/dZyQNy3-...",
       timestamp: "Fri",
       status: "online",
@@ -138,9 +141,10 @@ function ChatPageContent() {
     {
       id: "5",
       type: "agent",
-      name: "Short Video Editin...",
-      avatar: "🤖",
+      name: "Short Video Editing",
+      avatar: "🎬",
       avatarBg: "bg-cyan-100 text-cyan-800",
+      avatarImage: "https://api.dicebear.com/7.x/lorelei/svg?seed=VideoEdit&backgroundColor=cffafe",
       lastMessage: "Video generation is still block...",
       timestamp: "Fri",
       status: "online",
@@ -148,9 +152,10 @@ function ChatPageContent() {
     {
       id: "6",
       type: "agent",
-      name: "Litigation Ass...",
-      avatar: "🤖",
+      name: "Litigation Assistant",
+      avatar: "⚖️",
       avatarBg: "bg-rose-100 text-rose-800",
+      avatarImage: "https://api.dicebear.com/7.x/notionists/svg?seed=Litigation&backgroundColor=ffe4e6",
       lastMessage: "Hi! How can I help you today?",
       timestamp: "09/17/26",
       status: "online",
@@ -158,9 +163,10 @@ function ChatPageContent() {
     {
       id: "7",
       type: "agent",
-      name: "Video Optimi...",
-      avatar: "🤖",
+      name: "Video Optimization",
+      avatar: "🚀",
       avatarBg: "bg-pink-100 text-pink-800",
+      avatarImage: "https://api.dicebear.com/7.x/adventurer/svg?seed=VideoOpt&backgroundColor=fce7f3",
       lastMessage: "Your AI video is ready!...",
       timestamp: "09/17/26",
       status: "online",
@@ -168,9 +174,10 @@ function ChatPageContent() {
     {
       id: "8",
       type: "agent",
-      name: "Webpage De...",
-      avatar: "🤖",
+      name: "Webpage Designer",
+      avatar: "💻",
       avatarBg: "bg-emerald-100 text-emerald-800",
+      avatarImage: "https://api.dicebear.com/7.x/lorelei/svg?seed=WebDesign&backgroundColor=d1fae5",
       lastMessage: "[Custom Message]",
       timestamp: "09/06/26",
       status: "online",
@@ -178,9 +185,10 @@ function ChatPageContent() {
     {
       id: "9",
       type: "agent",
-      name: "Full Stack AI ...",
-      avatar: "🤖",
+      name: "Full Stack AI Specialist",
+      avatar: "⚡",
       avatarBg: "bg-sky-100 text-sky-800",
+      avatarImage: "https://api.dicebear.com/7.x/bottts/svg?seed=FullStack&backgroundColor=e0f2fe",
       lastMessage: "Real LLM activation path...",
       hasCheckmark: true,
       timestamp: "09/06/26",
@@ -501,11 +509,11 @@ function ChatPageContent() {
     setIsTyping(true);
 
     // Resolve LLM Provider and Model based on selected agentMode
-    let provider: string | undefined = undefined;
-    let model: string = "llama-3.3-70b-versatile";
+    let provider: string | undefined = "groq";
+    let model: string = "openai/gpt-oss-120b";
     if (agentMode === "Groq LLaMA" || agentMode === "Instant") {
       provider = "groq";
-      model = "llama-3.3-70b-versatile";
+      model = "openai/gpt-oss-120b";
     } else if (agentMode === "Gemini 2.5" || agentMode === "Auto" || agentMode === "Deep Think") {
       provider = "gemini";
       model = "gemini-2.5-flash";
@@ -719,6 +727,45 @@ function ChatPageContent() {
 
   const handleSuggestionClick = (promptText: string) => {
     setMessageInput(promptText);
+    textareaRef.current?.focus();
+  };
+
+  const handleActionSelect = (actionId: string) => {
+    switch (actionId) {
+      case "table_template":
+        setMessageInput("| Feature / Metric | Status | Priority |\n| :--- | :--- | :--- |\n| Memory Graph 2D | Active | P0 |\n| Groq AI Reasoning | Connected | P0 |\n| Skill Library | Enabled | P1 |");
+        break;
+      case "diagram_template":
+        setMessageInput("```mermaid\ngraph TD;\n  A[User Intent] --> B[Social Perception / Memory];\n  B --> C{Agent Reasoner - Groq 120B};\n  C -->|Execution| D[Live Tools & Skills];\n  C -->|Multi-agent| E[Squad Handoff];\n  D --> F[Persistent Result];\n  E --> F;\n```");
+        break;
+      case "web_search":
+        setMessageInput("@web_search Search the latest documentation and metrics for: ");
+        break;
+      case "calculator":
+        setMessageInput("@calculator Calculate: ");
+        break;
+      case "translator":
+        setMessageInput("@translate Translate the following text into fluent professional Urdu: ");
+        break;
+      case "screenshot":
+        setMessageInput("@screenshot Capture current viewport and analyze visual hierarchy");
+        break;
+      case "upload_file":
+      case "upload_image":
+        fileInputRef.current?.click();
+        return;
+      case "code_template":
+        setMessageInput("```python\ndef solve_problem(input_data):\n    # Autonomous execution routine\n    return result\n```");
+        break;
+      case "markdown_template":
+        setMessageInput("# Project Brief\n\n## Objectives\n- Goal 1\n- Goal 2\n\n## Architecture & Implementation\nDetailed technical analysis...");
+        break;
+      case "record_audio":
+        handleToggleVoice();
+        return;
+      default:
+        setMessageInput(`/${actionId} `);
+    }
     textareaRef.current?.focus();
   };
 
@@ -1510,7 +1557,11 @@ function ChatPageContent() {
         agentAvatar={selectedChat.avatar}
       />
 
-      <ActionHubModal isOpen={showActionHub} onClose={() => setShowActionHub(false)} />
+      <ActionHubModal
+        isOpen={showActionHub}
+        onClose={() => setShowActionHub(false)}
+        onActionSelect={handleActionSelect}
+      />
       <SkillLibraryModal isOpen={showSkillLibrary} onClose={() => setShowSkillLibrary(false)} />
       <ConnectorsModal isOpen={showConnectors} onClose={() => setShowConnectors(false)} />
       <GroupCreationModal

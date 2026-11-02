@@ -1,0 +1,102 @@
+# render.yaml — Abrazy.ai Backend on Render
+# Docs: https://render.com/docs/blueprint-spec
+#
+# SETUP INSTRUCTIONS:
+# 1. Push this repo to GitHub
+# 2. Go to render.com → New → Blueprint
+# 3. Connect your GitHub repo
+# 4. Render will read this file and create all services
+# 5. Fill in the secret environment variables in the Render dashboard
+
+services:
+  # ── Backend API ──────────────────────────────────────────
+  - type: web
+    name: abrazy-backend
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    healthCheckPath: /api/health
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: APP_NAME
+        value: Abrazy.ai
+      - key: ENVIRONMENT
+        value: production
+      - key: DEBUG
+        value: "false"
+      - key: LOG_LEVEL
+        value: INFO
+      # ── Set these in Render Dashboard (Secret) ──
+      - key: SECRET_KEY
+        sync: false   # fill in Render dashboard
+      - key: DATABASE_URL
+        sync: false   # Neon connection string
+      - key: REDIS_URL
+        sync: false   # Upstash or Render Redis URL
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: BASE_URL
+        sync: false   # e.g. https://abrazy-backend.onrender.com
+      - key: FRONTEND_URL
+        sync: false   # e.g. https://abrazy.vercel.app
+      - key: BACKEND_URL
+        sync: false   # same as BASE_URL
+      - key: CORS_ORIGINS
+        sync: false   # e.g. https://abrazy.vercel.app
+      # LLM model names (safe to hardcode)
+      - key: LLM_PROVIDER
+        value: groq
+      - key: GROQ_MODEL
+        value: openai/gpt-oss-120b
+      - key: GEMINI_MODEL
+        value: gemini-2.5-flash
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: ANTHROPIC_MODEL
+        value: claude-3-5-haiku-20241022
+      # Billing off by default
+      - key: BILLING_ENABLED
+        value: "false"
+      - key: RATE_LIMIT_PER_MINUTE
+        value: "60"
+
+  # ── Celery Worker ─────────────────────────────────────────
+  - type: worker
+    name: abrazy-worker
+    runtime: python
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: pip install -r requirements.txt
+    startCommand: celery -A app.workers.tasks worker --loglevel=info --concurrency=2
+    envVars:
+      - key: PYTHON_VERSION
+        value: "3.11"
+      - key: ENVIRONMENT
+        value: production
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: CELERY_BROKER_URL
+        sync: false
+      - key: CELERY_RESULT_BACKEND
+        sync: false
+      - key: SECRET_KEY
+        sync: false
+      - key: GROQ_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: LLM_PROVIDER
+        value: groq

@@ -172,45 +172,71 @@ class GroqAdapter(LLMAdapter):
         if not key:
             raise RuntimeError("GROQ_API_KEY not set")
         self.api_key = key
-        self.model = model or settings.GROQ_MODEL or "llama-3.3-70b-versatile"
+        self.model = model or settings.GROQ_MODEL or "openai/gpt-oss-120b"
 
     async def list_models(self) -> list[str]:
-        return ["llama-3.3-70b-versatile", "llama-3.1-8b-instant", "mixtral-8x7b-32768", "gemma2-9b-it"]
+        return ["openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b", "allam-2-7b"]
 
     async def complete(self, messages, model=None, tools=None, stream=False):
-        model = model or self.model
-        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
-        payload = {
-            "model": model,
-            "messages": [{"role": m.role, "content": m.content} for m in messages],
-            "stream": stream,
-        }
-        if tools:
-            payload["tools"] = [{"type": "function", "function": t} for t in tools]
-        async with httpx.AsyncClient(timeout=120) as c:
-            if not stream:
-                resp = await c.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers)
-                resp.raise_for_status()
-                data = resp.json()
-                content = data["choices"][0]["message"].get("content", "")
-                yield CompletionChunk(delta=content, done=True)
-                return
+        requested_model = model or self.model
+        # Robust candidate chain: requested -> primary -> fallbacks
+        candidates: list[str] = []
+        for m in [requested_model, self.model, "openai/gpt-oss-120b", "qwen/qwen3.8-27b", "openai/gpt-oss-20b"]:
+            if m and m not in candidates:
+                candidates.append(m)
 
-            async with c.stream("POST", "https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers) as resp:
-                resp.raise_for_status()
-                async for line in resp.aiter_lines():
-                    if not line.startswith("data:"):
-                        continue
-                    chunk = line[5:].strip()
-                    if chunk == "[DONE]":
-                        yield CompletionChunk(done=True)
+        headers = {"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"}
+        last_error = None
+
+        for candidate_model in candidates:
+            payload = {
+                "model": candidate_model,
+                "messages": [{"role": m.role, "content": m.content} for m in messages],
+                "stream": stream,
+            }
+            if tools:
+                payload["tools"] = [{"type": "function", "function": t} for t in tools]
+
+            try:
+                async with httpx.AsyncClient(timeout=120) as c:
+                    if not stream:
+                        resp = await c.post("https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers)
+                        if resp.status_code in (400, 404) and "model" in resp.text.lower():
+                            last_error = resp.text
+                            continue  # Try fallback model
+                        resp.raise_for_status()
+                        data = resp.json()
+                        content = data["choices"][0]["message"].get("content", "")
+                        yield CompletionChunk(delta=content, done=True)
                         return
-                    data = json.loads(chunk)
-                    choices = data.get("choices", [])
-                    if choices and "delta" in choices[0]:
-                        choice = choices[0]["delta"]
-                        if "content" in choice and choice["content"]:
-                            yield CompletionChunk(delta=choice["content"])
+
+                    async with c.stream("POST", "https://api.groq.com/openai/v1/chat/completions", json=payload, headers=headers) as resp:
+                        if resp.status_code in (400, 404):
+                            err_body = await resp.aread()
+                            if b"model" in err_body.lower():
+                                last_error = err_body.decode()
+                                continue  # Try fallback model
+                        resp.raise_for_status()
+                        async for line in resp.aiter_lines():
+                            if not line.startswith("data:"):
+                                continue
+                            chunk = line[5:].strip()
+                            if chunk == "[DONE]":
+                                yield CompletionChunk(done=True)
+                                return
+                            data = json.loads(chunk)
+                            choices = data.get("choices", [])
+                            if choices and "delta" in choices[0]:
+                                choice = choices[0]["delta"]
+                                if "content" in choice and choice["content"]:
+                                    yield CompletionChunk(delta=choice["content"])
+                        return  # Successfully finished streaming
+            except Exception as e:
+                last_error = e
+                continue
+
+        if last_error:
+            raise RuntimeError(f"All Groq models failed. Last error: {last_error}")
 
 
 class GeminiAdapter(LLMAdapter):

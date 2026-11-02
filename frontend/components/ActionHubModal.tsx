@@ -1,18 +1,38 @@
 "use client";
-import { useState } from "react";
+import React, { useState } from "react";
+import {
+  FileUp,
+  Image as ImageIcon,
+  Mic,
+  Video,
+  Code,
+  FileText,
+  Table as TableIcon,
+  GitBranch,
+  Search,
+  Calculator,
+  Languages,
+  Camera,
+  Layers,
+  Folder,
+  X,
+  Sparkles,
+  Wrench,
+  Check,
+} from "lucide-react";
 
 interface ActionHubModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onActionSelect?: (action: string) => void;
+  onActionSelect?: (actionId: string) => void;
 }
 
 interface Action {
   id: string;
   name: string;
   description: string;
-  icon: string;
   category: "file" | "media" | "template" | "tool";
+  iconComponent: React.ComponentType<{ className?: string }>;
 }
 
 export default function ActionHubModal({ isOpen, onClose, onActionSelect }: ActionHubModalProps) {
@@ -23,102 +43,103 @@ export default function ActionHubModal({ isOpen, onClose, onActionSelect }: Acti
     // File Actions
     {
       id: "upload_file",
-      name: "Upload File",
-      description: "Upload documents, PDFs, or any file",
-      icon: "📄",
+      name: "Upload Document",
+      description: "Attach PDF, DOCX, CSV, or code files for instant AI parsing",
       category: "file",
+      iconComponent: FileUp,
     },
     {
       id: "upload_image",
       name: "Upload Image",
-      description: "Add images to your conversation",
-      icon: "🖼️",
+      description: "Add design mockups, diagrams, or screenshots to your conversation",
       category: "media",
+      iconComponent: ImageIcon,
     },
     {
       id: "record_audio",
-      name: "Record Audio",
-      description: "Record voice message or audio",
-      icon: "🎤",
+      name: "Record Voice Note",
+      description: "Dictate voice prompt with automatic Urdu/English transcription",
       category: "media",
+      iconComponent: Mic,
     },
     {
       id: "record_video",
-      name: "Record Video",
-      description: "Record video message",
-      icon: "🎥",
+      name: "Record Video Clip",
+      description: "Screen record or camera message for multimodal AI analysis",
       category: "media",
+      iconComponent: Video,
     },
     // Template Actions
     {
-      id: "code_template",
-      name: "Code Snippet",
-      description: "Insert code template",
-      icon: "💻",
-      category: "template",
-    },
-    {
-      id: "markdown_template",
-      name: "Markdown Doc",
-      description: "Create markdown document",
-      icon: "📝",
-      category: "template",
-    },
-    {
       id: "table_template",
-      name: "Table",
-      description: "Insert formatted table",
-      icon: "📊",
+      name: "Markdown Table",
+      description: "Insert a pre-formatted markdown comparison table",
       category: "template",
+      iconComponent: TableIcon,
     },
     {
       id: "diagram_template",
-      name: "Diagram",
-      description: "Create flowchart or diagram",
-      icon: "📈",
+      name: "Mermaid Flowchart",
+      description: "Generate system architecture diagram with Mermaid.js syntax",
       category: "template",
+      iconComponent: GitBranch,
+    },
+    {
+      id: "code_template",
+      name: "Code Snippet",
+      description: "Insert Python or TypeScript scaffold for code review",
+      category: "template",
+      iconComponent: Code,
+    },
+    {
+      id: "markdown_template",
+      name: "Technical Brief",
+      description: "Create an executive specification document template",
+      category: "template",
+      iconComponent: FileText,
     },
     // Tool Actions
     {
       id: "web_search",
-      name: "Web Search",
-      description: "Search the web for information",
-      icon: "🔍",
+      name: "Live Web Search",
+      description: "Query real-time web sources and synthesize citations",
       category: "tool",
+      iconComponent: Search,
     },
     {
       id: "calculator",
-      name: "Calculator",
-      description: "Perform calculations",
-      icon: "🔢",
+      name: "Financial Calculator",
+      description: "Compute compound interest, currency conversions, and math formulas",
       category: "tool",
+      iconComponent: Calculator,
     },
     {
       id: "translator",
-      name: "Translator",
-      description: "Translate text to any language",
-      icon: "🌐",
+      name: "Bilingual Translator",
+      description: "Translate high-context text between English, Urdu, and Arabic",
       category: "tool",
+      iconComponent: Languages,
     },
     {
       id: "screenshot",
-      name: "Screenshot",
-      description: "Take or paste screenshot",
-      icon: "📸",
+      name: "Viewport Screenshot",
+      description: "Capture active webpage state and inspect UI layout elements",
       category: "tool",
+      iconComponent: Camera,
     },
   ];
 
   const categories = [
-    { id: "all", name: "All", icon: "✨" },
-    { id: "file", name: "Files", icon: "📁" },
-    { id: "media", name: "Media", icon: "🎬" },
-    { id: "template", name: "Templates", icon: "📋" },
-    { id: "tool", name: "Tools", icon: "🛠️" },
+    { id: "all", name: "All Actions", iconComponent: Sparkles },
+    { id: "template", name: "Templates", iconComponent: FileText },
+    { id: "tool", name: "Agent Tools", iconComponent: Wrench },
+    { id: "file", name: "Files", iconComponent: Folder },
+    { id: "media", name: "Media", iconComponent: Video },
   ];
 
-  const filteredActions = actions.filter(action => {
-    const matchesSearch = searchQuery === "" || 
+  const filteredActions = actions.filter((action) => {
+    const matchesSearch =
+      searchQuery === "" ||
       action.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       action.description.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesCategory = selectedCategory === "all" || action.category === selectedCategory;
@@ -133,102 +154,106 @@ export default function ActionHubModal({ isOpen, onClose, onActionSelect }: Acti
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={onClose}>
-      <div className="absolute inset-0 bg-black bg-opacity-50"></div>
-
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in" onClick={onClose}>
       <div
-        className="relative bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[80vh] flex flex-col overflow-hidden"
+        className="relative bg-white rounded-3xl shadow-2xl w-full max-w-2xl max-h-[82vh] flex flex-col overflow-hidden border border-slate-200"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
-        <div className="p-6 border-b border-slate-200">
+        <div className="p-6 border-b border-slate-200/90 bg-white">
           <div className="flex items-center justify-between mb-4">
-            <div>
-              <h2 className="text-2xl font-bold text-slate-900">Action Hub</h2>
-              <p className="text-sm text-slate-600 mt-1">Quick actions for your workflow</p>
+            <div className="flex items-center gap-2.5">
+              <div className="w-10 h-10 rounded-2xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                <Wrench className="w-5 h-5 text-[#00D35A]" />
+              </div>
+              <div>
+                <h2 className="text-xl font-bold text-slate-900">Action Hub</h2>
+                <p className="text-xs text-slate-500">Insert smart templates, attachments, and autonomous tools</p>
+              </div>
             </div>
             <button
               onClick={onClose}
-              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 transition-colors"
+              className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-slate-100 text-slate-500 hover:text-slate-800 transition"
             >
-              <svg className="w-5 h-5 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-              </svg>
+              <X className="w-5 h-5" />
             </button>
           </div>
 
           {/* Search Bar */}
           <div className="relative">
+            <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search actions..."
-              className="w-full px-4 py-2.5 pl-10 bg-slate-100 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-[#00D35A] transition-all"
+              placeholder="Search actions (e.g. Table, Diagram, Search, Calculator)..."
+              className="w-full px-4 py-2.5 pl-10 bg-slate-50 border border-slate-200 rounded-xl text-xs text-slate-900 focus:outline-none focus:border-[#00D35A] focus:bg-white transition"
             />
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
           </div>
 
           {/* Category Tabs */}
-          <div className="flex gap-2 mt-4 overflow-x-auto pb-1">
-            {categories.map(category => (
-              <button
-                key={category.id}
-                onClick={() => setSelectedCategory(category.id)}
-                className={`px-3 py-1.5 rounded-lg text-sm font-medium whitespace-nowrap transition-colors ${
-                  selectedCategory === category.id
-                    ? "bg-[#00D35A] text-white"
-                    : "bg-slate-100 text-slate-700 hover:bg-slate-200"
-                }`}
-              >
-                {category.icon} {category.name}
-              </button>
-            ))}
+          <div className="flex gap-1.5 mt-3 overflow-x-auto pb-0.5">
+            {categories.map((category) => {
+              const IconComp = category.iconComponent;
+              const isSelected = selectedCategory === category.id;
+              return (
+                <button
+                  key={category.id}
+                  onClick={() => setSelectedCategory(category.id)}
+                  className={`px-3 py-1.5 rounded-full text-xs font-semibold whitespace-nowrap transition flex items-center gap-1.5 ${
+                    isSelected
+                      ? "bg-[#00D35A] text-white shadow-xs"
+                      : "bg-slate-100 text-slate-600 hover:bg-slate-200"
+                  }`}
+                >
+                  <IconComp className="w-3.5 h-3.5" />
+                  <span>{category.name}</span>
+                </button>
+              );
+            })}
           </div>
         </div>
 
         {/* Actions Grid */}
-        <div className="flex-1 overflow-y-auto p-6">
-          <div className="grid grid-cols-2 gap-3">
-            {filteredActions.map(action => (
-              <button
-                key={action.id}
-                onClick={() => handleActionClick(action.id)}
-                className="p-4 bg-slate-50 hover:bg-slate-100 rounded-xl text-left transition-all hover:shadow-md group border border-transparent hover:border-[#00D35A]"
-              >
-                <div className="flex items-start gap-3">
-                  <div className="text-3xl flex-shrink-0">{action.icon}</div>
+        <div className="flex-1 overflow-y-auto p-5 bg-slate-50/50">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            {filteredActions.map((action) => {
+              const IconComp = action.iconComponent;
+              return (
+                <button
+                  key={action.id}
+                  onClick={() => handleActionClick(action.id)}
+                  className="p-3.5 bg-white hover:bg-emerald-50/40 rounded-2xl text-left transition-all border border-slate-200/90 hover:border-[#00D35A] shadow-xs hover:shadow-md group flex items-start gap-3 active:scale-[0.99]"
+                >
+                  <div className="w-9 h-9 rounded-xl bg-slate-100 group-hover:bg-[#eaf8ee] flex items-center justify-center flex-shrink-0 transition">
+                    <IconComp className="w-5 h-5 text-slate-600 group-hover:text-[#00D35A] transition" />
+                  </div>
                   <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-slate-900 mb-1 group-hover:text-[#00D35A] transition-colors">
+                    <h3 className="font-bold text-xs text-slate-900 group-hover:text-[#00D35A] transition">
                       {action.name}
                     </h3>
-                    <p className="text-xs text-slate-600 line-clamp-2">
+                    <p className="text-[11px] text-slate-500 line-clamp-2 mt-0.5 leading-relaxed">
                       {action.description}
                     </p>
                   </div>
-                </div>
-              </button>
-            ))}
+                </button>
+              );
+            })}
           </div>
 
           {filteredActions.length === 0 && (
-            <div className="text-center py-12">
-              <div className="text-6xl mb-4">🔍</div>
-              <h3 className="text-lg font-semibold text-slate-900 mb-2">No actions found</h3>
-              <p className="text-sm text-slate-600">
-                Try searching with different keywords
-              </p>
+            <div className="text-center py-12 text-slate-400">
+              <Search className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <h3 className="text-xs font-bold text-slate-700">No actions found</h3>
+              <p className="text-[11px] text-slate-400 mt-1">Try searching with another keyword like &quot;table&quot; or &quot;search&quot;</p>
             </div>
           )}
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-slate-200 bg-slate-50">
-          <p className="text-xs text-slate-600 text-center">
-            💡 Tip: Press <kbd className="px-2 py-0.5 bg-white border border-slate-300 rounded text-slate-700 font-mono">Ctrl+K</kbd> to open Action Hub anytime
-          </p>
+        <div className="p-3.5 border-t border-slate-200 bg-white flex items-center justify-between text-[11px] text-slate-500">
+          <span>Click any card to immediately insert template into chat</span>
+          <span className="font-semibold text-slate-600">Tip: Shift+Enter for newlines</span>
         </div>
       </div>
     </div>

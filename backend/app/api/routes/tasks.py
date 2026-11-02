@@ -13,13 +13,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, get_optional_user
 from app.core.db import async_session_maker, get_db
 from app.core.security import create_access_token
-from app.models import Agent, Conversation, Message as DBMessage, Task, User
+from app.models import Agent, Conversation, Message as DBMessage, Task, User, MemoryNode, MemoryLink
 from app.schemas import TaskCreate, TaskOut
 from app.agents.llm import Message, get_adapter
 from app.agents.tools import get_tool, tool_schemas
 from app.workers import tasks as worker_tasks
 from sqlalchemy import func, or_, select
 import re
+import logging
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
@@ -145,17 +146,19 @@ async def cancel_task(task_id: str, user: User = Depends(get_current_user), db: 
     return task
 
 
-# --- Chat: talk to an agent or multi-agent group (SSE streaming) ---
+# --- Chat: talk to an agent or multi-agent group (SSE streaming with Social Brain Model) ---
 @router.post("/chat/stream")
 async def chat_stream(body: dict, user: User | None = Depends(get_optional_user), db: AsyncSession = Depends(get_db)):
     conversation_id = body.get("conversation_id")
     agent_id = body.get("agent_id")
     agent_name = body.get("agent_name", "")
     message = body.get("message", "")
-    model = body.get("model", "gemma3:4b")
-    provider = body.get("provider")
+    model = body.get("model") or "openai/gpt-oss-120b"
+    if model in ("llama-3.3-70b-versatile", "gemma3:4b"):
+        model = "openai/gpt-oss-120b"
+    provider = body.get("provider") or "groq"
     api_key = body.get("api_key")
-    
+
     conv: Conversation | None = None
     if conversation_id:
         conv = (await db.execute(select(Conversation).where(Conversation.id == conversation_id))).scalar_one_or_none()
@@ -182,37 +185,99 @@ async def chat_stream(body: dict, user: User | None = Depends(get_optional_user)
         conv.updated_at = func.now()
         await db.commit()
 
+    # 1. Social Perception & Living Memory Injection
+    mem_context_lines: list[str] = []
+    try:
+        mem_rows = (await db.execute(select(MemoryNode).order_by(MemoryNode.created_at.desc()).limit(6))).scalars().all()
+        for m in mem_rows:
+            mem_context_lines.append(f"• [{m.category}] {m.title}: {m.content or ''}")
+    except Exception as e:
+        logging.getLogger("api").debug("Failed loading memory nodes for context: %s", e)
+
+    mem_prompt_addon = (
+        "\n\n[Abrazy Social Brain & Living Memory Context]:\n" +
+        ("\n".join(mem_context_lines) if mem_context_lines else "• Core Knowledge: Abrazy AI Human-Agent Collaborative Platform.")
+    )
+
+    # 2. Multi-turn Conversational History
+    past_history: list[Message] = []
+    if conversation_id:
+        try:
+            past_db_msgs = (await db.execute(
+                select(DBMessage)
+                .where(DBMessage.conversation_id == conversation_id)
+                .order_by(DBMessage.created_at.desc())
+                .limit(8)
+            )).scalars().all()
+            for p in reversed(past_db_msgs):
+                if p.content != message:
+                    role = "user" if p.sender_type == "user" else "assistant"
+                    past_history.append(Message(role=role, content=p.content))
+        except Exception as e:
+            logging.getLogger("api").debug("Failed loading past history: %s", e)
+
+    # Helper for auto-extracting & learning new memory nodes
+    async def _auto_learn_memory(user_prompt: str, agent_output: str, user_ref_id: str | None):
+        if len(user_prompt.strip()) > 3 and len(agent_output.strip()) > 10:
+            try:
+                async with async_session_maker() as m_db:
+                    clean_title = user_prompt.strip()[:50]
+                    new_mem = MemoryNode(
+                        user_id=user_ref_id or "system",
+                        title=clean_title,
+                        category="Conversations",
+                        color="#00D35A",
+                        size=13,
+                        content=f"Topic: {user_prompt[:200]}\nInsight: {agent_output[:250]}",
+                    )
+                    m_db.add(new_mem)
+                    await m_db.flush()
+
+                    last_node = (await m_db.execute(
+                        select(MemoryNode).where(MemoryNode.id != new_mem.id).order_by(MemoryNode.created_at.desc()).limit(1)
+                    )).scalar_one_or_none()
+                    if last_node:
+                        link = MemoryLink(
+                            source_id=last_node.id,
+                            target_id=new_mem.id,
+                            strength=2,
+                            label="discusses"
+                        )
+                        m_db.add(link)
+                    await m_db.commit()
+            except Exception as ex:
+                logging.getLogger("api").debug("Memory auto-learn skipped: %s", ex)
+
     # Determine if this is a Multi-Agent Group Chat
     is_group_chat = bool(conv and conv.is_group)
 
     if is_group_chat:
-        # Load all squad member agents
         member_ids = conv.member_agent_ids or []
         group_agents: list[Agent] = []
         if member_ids:
             agent_rows = (await db.execute(select(Agent).where(Agent.id.in_(member_ids)))).scalars().all()
             agent_map = {a.id: a for a in agent_rows}
             group_agents = [agent_map[mid] for mid in member_ids if mid in agent_map]
-        
-        # Fallback if no members found
+
         if not group_agents:
             group_agents = (await db.execute(select(Agent).order_by(Agent.is_official.desc()).limit(3))).scalars().all()
 
         async def gen_group():
             collaborative_context: list[str] = []
 
-            for idx, agent in enumerate(group_agents):
-                agent_display = agent.name or f"Agent {idx + 1}"
-                agent_avatar = agent.avatar or "🤖"
+            for idx, grp_agent in enumerate(group_agents):
+                agent_display = grp_agent.name or f"Agent {idx + 1}"
+                agent_avatar = grp_agent.avatar or "🤖"
                 agent_artifacts: list[dict] = []
 
-                # Notify client that this agent has begun speaking
-                yield f"data: {json.dumps({'type': 'agent_start', 'agent_id': agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
+                yield f"data: {json.dumps({'type': 'agent_start', 'agent_id': grp_agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
 
                 system_prompt = (
-                    f"You are {agent.name}, a specialized autonomous AI agent in {agent.category}.\n"
-                    f"Your background: {agent.description or 'Expert collaborator'}.\n"
-                    f"You are collaborating live inside an expert multi-agent squad. Address the user's inquiry, build upon and coordinate with your teammate agents, and provide domain-specific insights without unnecessary repetition.\n\n"
+                    f"You are {grp_agent.name}, a specialized autonomous AI agent in {grp_agent.category}.\n"
+                    f"Background: {grp_agent.description or 'Expert collaborator'}.\n"
+                    f"You are collaborating live inside an expert multi-agent squad in Abrazy AI. "
+                    f"Coordinate seamlessly with your teammate agents, provide domain-specific insights, and suggest proactive next steps.\n"
+                    f"{mem_prompt_addon}\n\n"
                     f"You have access to real live tools:\n"
                     f"- web_search(query: str): Live public web search for facts, news, documentation.\n"
                     f"- image_generate(prompt: str): Generate a live image using Pollinations AI.\n"
@@ -220,81 +285,76 @@ async def chat_stream(body: dict, user: User | None = Depends(get_optional_user)
                     f"To invoke a tool, output: <<tool {{\"name\": \"tool_name\", \"args\": {{...}}}}>>"
                 )
 
-                agent_messages = [Message(role="system", content=system_prompt), Message(role="user", content=message)]
+                agent_messages = [Message(role="system", content=system_prompt)] + past_history + [Message(role="user", content=message)]
                 if collaborative_context:
                     prior_contributions = "\n\n".join(collaborative_context)
-                    agent_messages.append(Message(role="user", content=f"Prior teammate contributions in this discussion:\n{prior_contributions}\n\nPlease add your domain perspective as {agent_display}:"))
+                    agent_messages.append(Message(role="user", content=f"Prior teammate contributions in this discussion:\n{prior_contributions}\n\nPlease add your perspective as {agent_display}:"))
 
-                # Check if user message directly requested tool for first agent or relevant agent
                 if idx == 0:
                     user_tool = _detect_user_tool_intent(message)
                     if user_tool:
                         t_name, t_args = user_tool
-                        yield f"data: {json.dumps({'type': 'tool_start', 'tool': t_name, 'args': t_args, 'agent_id': agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
+                        yield f"data: {json.dumps({'type': 'tool_start', 'tool': t_name, 'args': t_args, 'agent_id': grp_agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
                         t_res, t_art = await _execute_tool_call(t_name, t_args, user.id if user else "user", db)
                         if t_art:
                             agent_artifacts.append(t_art)
-                            yield f"data: {json.dumps({'type': 'artifact', 'artifact': t_art, 'agent_id': agent.id, 'agent_name': agent_display})}\n\n"
+                            yield f"data: {json.dumps({'type': 'artifact', 'artifact': t_art, 'agent_id': grp_agent.id, 'agent_name': agent_display})}\n\n"
                         yield f"data: {json.dumps({'type': 'tool_done', 'tool': t_name, 'result': t_res, 'agent_name': agent_display})}\n\n"
                         agent_messages.append(Message(role="system", content=f"[Live Tool Observation: {t_name}]\n{t_res}\nAddress the user using this verified live data. If an image was generated, include markdown image link: ![{t_args.get('prompt', 'image')}]({t_art.get('url') if t_art else ''})"))
 
-                adapter = get_adapter(provider=provider, api_key=api_key, model=model or agent.model)
+                adapter = get_adapter(provider=provider, api_key=api_key, model=model or grp_agent.model)
                 current_agent_words: list[str] = []
 
                 try:
-                    async for chunk in adapter.complete(agent_messages, model=model or agent.model, stream=True):
+                    async for chunk in adapter.complete(agent_messages, model=model or grp_agent.model, stream=True):
                         if chunk.delta:
                             current_agent_words.append(chunk.delta)
-                            yield f"data: {json.dumps({'type': 'delta', 'delta': chunk.delta, 'agent_id': agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
-                except Exception:
-                    # Fallback collaborative response for group member
-                    fallback_reply = (
-                        f"As {agent_display} ({agent.category}), I have reviewed the objective: \"{message}\". "
-                        f"I recommend prioritizing modular execution and validating deliverables against our squad milestones."
-                    )
-                    words = fallback_reply.split(" ")
-                    for w in words:
-                        wd = w + " "
-                        current_agent_words.append(wd)
-                        yield f"data: {json.dumps({'type': 'delta', 'delta': wd, 'agent_id': agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
-                        await asyncio.sleep(0.04)
+                            yield f"data: {json.dumps({'type': 'delta', 'delta': chunk.delta, 'agent_id': grp_agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
+                except Exception as err:
+                    logging.getLogger("api").warning("Group agent stream error, falling back to Gemini: %s", err)
+                    try:
+                        gem_adapter = get_adapter(provider="gemini", model="gemini-2.5-flash")
+                        async for chunk in gem_adapter.complete(agent_messages, model="gemini-2.5-flash", stream=True):
+                            if chunk.delta:
+                                current_agent_words.append(chunk.delta)
+                                yield f"data: {json.dumps({'type': 'delta', 'delta': chunk.delta, 'agent_id': grp_agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
+                    except Exception:
+                        pass
 
                 agent_full_text = "".join(current_agent_words).strip()
 
-                # Dynamic tool execution if agent emitted <<tool ...>>
                 if _contains_tool_request(agent_full_text):
                     t_call = _parse_tool_request(agent_full_text)
                     if t_call and "name" in t_call and "args" in t_call:
                         t_name = t_call["name"]
                         t_args = t_call["args"]
-                        yield f"data: {json.dumps({'type': 'tool_start', 'tool': t_name, 'args': t_args, 'agent_id': agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
+                        yield f"data: {json.dumps({'type': 'tool_start', 'tool': t_name, 'args': t_args, 'agent_id': grp_agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
                         t_res, t_art = await _execute_tool_call(t_name, t_args, user.id if user else "user", db)
                         if t_art:
                             agent_artifacts.append(t_art)
-                            yield f"data: {json.dumps({'type': 'artifact', 'artifact': t_art, 'agent_id': agent.id, 'agent_name': agent_display})}\n\n"
+                            yield f"data: {json.dumps({'type': 'artifact', 'artifact': t_art, 'agent_id': grp_agent.id, 'agent_name': agent_display})}\n\n"
                         yield f"data: {json.dumps({'type': 'tool_done', 'tool': t_name, 'result': t_res, 'agent_name': agent_display})}\n\n"
 
                         agent_messages.append(Message(role="assistant", content=agent_full_text))
-                        agent_messages.append(Message(role="user", content=f"Tool result for '{t_name}':\n{t_res}\nPlease complete your response now to the user incorporating this result. Display markdown images if generated."))
+                        agent_messages.append(Message(role="user", content=f"Tool result for '{t_name}':\n{t_res}\nPlease complete your response incorporating this result."))
 
                         try:
-                            async for chunk in adapter.complete(agent_messages, model=model or agent.model, stream=True):
+                            async for chunk in adapter.complete(agent_messages, model=model or grp_agent.model, stream=True):
                                 if chunk.delta:
                                     agent_full_text += chunk.delta
-                                    yield f"data: {json.dumps({'type': 'delta', 'delta': chunk.delta, 'agent_id': agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
+                                    yield f"data: {json.dumps({'type': 'delta', 'delta': chunk.delta, 'agent_id': grp_agent.id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
                         except Exception:
                             pass
 
-                collaborative_context.append(f"[{agent_display} - {agent.category}]: {agent_full_text}")
+                collaborative_context.append(f"[{agent_display} - {grp_agent.category}]: {agent_full_text}")
 
-                # Persist this agent's response to the database
                 if conversation_id and agent_full_text:
                     try:
                         async with async_session_maker() as stream_db:
                             agent_msg = DBMessage(
                                 conversation_id=conversation_id,
                                 sender_type="agent",
-                                sender_id=agent.id,
+                                sender_id=grp_agent.id,
                                 sender_name=agent_display,
                                 content=agent_full_text,
                                 artifacts=agent_artifacts or None,
@@ -305,11 +365,15 @@ async def chat_stream(body: dict, user: User | None = Depends(get_optional_user)
                                 c.updated_at = func.now()
                             await stream_db.commit()
                     except Exception as e:
-                        import logging
                         logging.getLogger("api").warning("Failed to save group agent message: %s", e)
 
-                yield f"data: {json.dumps({'type': 'agent_done', 'agent_id': agent.id, 'agent_name': agent_display})}\n\n"
-                await asyncio.sleep(0.1)
+                yield f"data: {json.dumps({'type': 'agent_done', 'agent_id': grp_agent.id, 'agent_name': agent_display})}\n\n"
+                await asyncio.sleep(0.08)
+
+            # Auto-save memory node from squad discussion
+            if collaborative_context:
+                squad_summary = " ".join([c[:100] for c in collaborative_context])
+                await _auto_learn_memory(message, squad_summary, user.id if user else None)
 
             yield f"data: {json.dumps({'done': True})}\n\n"
 
@@ -327,24 +391,25 @@ async def chat_stream(body: dict, user: User | None = Depends(get_optional_user)
         system = agent.system_prompt or f"You are {agent.name}, a specialized AI agent for {agent.category}. Assist the user directly and professionally."
         tools = agent.tools or ["web_search", "image_generate", "read_url"]
     elif agent_name:
-        system = f"You are {agent_name}, a specialized autonomous AI agent. Deliver concise, high-value domain expertise."
+        system = f"You are {agent_name}, a specialized autonomous AI agent in Abrazy AI. Deliver concise, high-value domain expertise."
         tools = ["web_search", "image_generate", "read_url"]
     else:
-        system = "You are a helpful AI assistant."
+        system = "You are a helpful AI assistant in Abrazy AI."
         tools = ["web_search", "image_generate", "read_url"]
 
-    # Append live tools instruction to system prompt
+    system += mem_prompt_addon
     system += (
         "\n\nYou have access to real live tools:\n"
         "- web_search(query: str): Live public web search for facts, news, documentation.\n"
         "- image_generate(prompt: str): Generate a live image using Pollinations AI.\n"
         "- read_url(url: str): Read and summarize live webpage URLs.\n\n"
         "To invoke a tool, output: <<tool {\"name\": \"tool_name\", \"args\": {...}}>>\n"
-        "When an image is generated, display the markdown image link: ![prompt](image_url)."
+        "When an image is generated, display the markdown image link: ![prompt](image_url).\n"
+        "Always be structured, insightful, and proactive with clear follow-up suggestions."
     )
 
     adapter = get_adapter(provider=provider, api_key=api_key, model=model)
-    messages = [Message(role="system", content=system), Message(role="user", content=message)]
+    messages = [Message(role="system", content=system)] + past_history + [Message(role="user", content=message)]
     schemas = None
     if tools:
         try:
@@ -358,10 +423,10 @@ async def chat_stream(body: dict, user: User | None = Depends(get_optional_user)
         agent_display = agent.name if agent else (agent_name or "AI Assistant")
         agent_avatar = agent.avatar if agent else "🤖"
 
-        # Emit agent_start for unified protocol
+        # Emit agent_start
         yield f"data: {json.dumps({'type': 'agent_start', 'agent_id': agent.id if agent else agent_id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
 
-        # 1. Pre-execution: check if user prompt is an explicit invocation for web_search, image_generate, or read_url
+        # 1. Pre-execution user tool intent
         user_tool = _detect_user_tool_intent(message)
         if user_tool:
             t_name, t_args = user_tool
@@ -381,22 +446,22 @@ async def chat_stream(body: dict, user: User | None = Depends(get_optional_user)
                 if chunk.delta:
                     full_response.append(chunk.delta)
                     yield f"data: {json.dumps({'type': 'delta', 'delta': chunk.delta, 'agent_id': agent.id if agent else agent_id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
-        except Exception:
-            # Fallback streaming when local LLM service (Ollama) is not running
-            fallback_text = (
-                f"Hello! I am {agent_display}. I have processed your instruction: \"{message}\".\n\n"
-                f"Autonomous background tasks have been queued. Let me know if you would like me to generate assets, analyze data, or dispatch actions."
-            )
-            words = fallback_text.split(" ")
-            for w in words:
-                word_delta = w + " "
-                full_response.append(word_delta)
-                yield f"data: {json.dumps({'type': 'delta', 'delta': word_delta, 'agent_id': agent.id if agent else agent_id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
-                await asyncio.sleep(0.04)
+        except Exception as err:
+            logging.getLogger("api").warning("Chat primary model failed, failing over to Gemini: %s", err)
+            try:
+                gemini_adapter = get_adapter(provider="gemini", model="gemini-2.5-flash")
+                async for chunk in gemini_adapter.complete(messages, model="gemini-2.5-flash", stream=True):
+                    if chunk.delta:
+                        full_response.append(chunk.delta)
+                        yield f"data: {json.dumps({'type': 'delta', 'delta': chunk.delta, 'agent_id': agent.id if agent else agent_id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
+            except Exception as gem_err:
+                err_text = f"Unable to reach the language model right now ({err}). Please check your API key or network connection."
+                full_response.append(err_text)
+                yield f"data: {json.dumps({'type': 'delta', 'delta': err_text, 'agent_id': agent.id if agent else agent_id, 'agent_name': agent_display, 'avatar': agent_avatar})}\n\n"
 
         final_text = "".join(full_response).strip()
 
-        # 2. Post-generation: check if model itself requested a tool via <<tool ...>>
+        # 2. Dynamic model-initiated tool execution
         if _contains_tool_request(final_text):
             t_call = _parse_tool_request(final_text)
             if t_call and "name" in t_call and "args" in t_call:
@@ -410,7 +475,7 @@ async def chat_stream(body: dict, user: User | None = Depends(get_optional_user)
                 yield f"data: {json.dumps({'type': 'tool_done', 'tool': t_name, 'result': t_res, 'agent_name': agent_display})}\n\n"
 
                 messages.append(Message(role="assistant", content=final_text))
-                messages.append(Message(role="user", content=f"Tool result for '{t_name}':\n{t_res}\nPlease complete your response now to the user incorporating this result. Display markdown images if generated."))
+                messages.append(Message(role="user", content=f"Tool result for '{t_name}':\n{t_res}\nPlease complete your response incorporating this result."))
 
                 try:
                     async for chunk in adapter.complete(messages, model=model, stream=True):
@@ -420,6 +485,7 @@ async def chat_stream(body: dict, user: User | None = Depends(get_optional_user)
                 except Exception:
                     pass
 
+        # Persist assistant message
         if conversation_id and final_text:
             try:
                 async with async_session_maker() as stream_db:
@@ -437,8 +503,10 @@ async def chat_stream(body: dict, user: User | None = Depends(get_optional_user)
                         c.updated_at = func.now()
                     await stream_db.commit()
             except Exception as e:
-                import logging
-                logging.getLogger("api").warning("Failed to save streamed assistant message to DB: %s", e)
+                logging.getLogger("api").warning("Failed to save streamed assistant message: %s", e)
+
+        # 3. Social Brain: Auto-learn interaction into Living Memory Graph
+        await _auto_learn_memory(message, final_text, user.id if user else None)
 
         yield f"data: {json.dumps({'type': 'agent_done', 'agent_id': agent.id if agent else agent_id, 'agent_name': agent_display})}\n\n"
         yield f"data: {json.dumps({'done': True})}\n\n"

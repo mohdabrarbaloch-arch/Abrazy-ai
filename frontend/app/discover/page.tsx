@@ -3,6 +3,18 @@ import React, { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import NavigationRail from "@/components/NavigationRail";
 import { API_URL } from "@/lib/config";
+import { Shield, Coins, Video, Zap, Bot, Search, Plus, Sparkles, Check, Trash2, ArrowRight, Award, Compass } from "lucide-react";
+
+const AVATAR_PRESETS = [
+  "https://api.dicebear.com/7.x/notionists/svg?seed=bookkeeper&backgroundColor=fef3c7",
+  "https://api.dicebear.com/7.x/notionists/svg?seed=finance&backgroundColor=ffe4e6",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=eventfinder&backgroundColor=fef3c7",
+  "https://api.dicebear.com/7.x/lorelei/svg?seed=customerservice&backgroundColor=d1fae5",
+  "https://api.dicebear.com/7.x/bottts/svg?seed=threatintel&backgroundColor=f3e8ff",
+  "https://api.dicebear.com/7.x/adventurer/svg?seed=videoopt&backgroundColor=ffe4e6",
+  "https://api.dicebear.com/7.x/lorelei/svg?seed=brandguardian&backgroundColor=e0e7ff",
+  "https://api.dicebear.com/7.x/bottts/svg?seed=secops&backgroundColor=fef3c7",
+];
 
 interface Agent {
   id: string;
@@ -44,7 +56,7 @@ function DiscoverPageContent() {
   const [newAgentName, setNewAgentName] = useState("");
   const [newAgentCategory, setNewAgentCategory] = useState("Engineering");
   const [newAgentDescription, setNewAgentDescription] = useState("");
-  const [newAgentAvatar, setNewAgentAvatar] = useState("🤖");
+  const [newAgentAvatar, setNewAgentAvatar] = useState(AVATAR_PRESETS[0]);
   const [newAgentAvatarBg, setNewAgentAvatarBg] = useState("bg-emerald-100/80");
   const [newAgentSystemPrompt, setNewAgentSystemPrompt] = useState("");
   const [newAgentModel, setNewAgentModel] = useState("Claude 3.5 Sonnet");
@@ -75,7 +87,7 @@ function DiscoverPageContent() {
     {
       id: "agent_bookkeeper",
       name: "Bookkeeper & Controller",
-      avatar: "📚",
+      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=bookkeeper&backgroundColor=fef3c7",
       avatarBg: "bg-amber-100/80",
       description: "Expert bookkeeper and controller specializing in day-to-day accounting operations, financial reporting, and invoice reconciliation.",
       category: "Finance",
@@ -86,7 +98,7 @@ function DiscoverPageContent() {
     {
       id: "agent_finance_ops",
       name: "Finance Operations Partner",
-      avatar: "💼",
+      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=finance&backgroundColor=ffe4e6",
       avatarBg: "bg-rose-100/80",
       description: "Streamlines expense, accounting, treasury, compliance, and audit workflows with AI-powered financial precision.",
       category: "Finance",
@@ -97,9 +109,9 @@ function DiscoverPageContent() {
     {
       id: "agent_event_finder",
       name: "AI Event Finder",
-      avatar: "🚀",
+      avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=eventfinder&backgroundColor=fef3c7",
       avatarBg: "bg-amber-100/90",
-      description: "Weekly AI event scanner that discovers, curates, and broadcasts important AI events to the Teamily community.",
+      description: "Weekly AI event scanner that discovers, curates, and broadcasts important AI events to the Abrazy community.",
       category: "Operations",
       tags: ["events", "ai", "curation", "calendar"],
       createdBy: "official",
@@ -108,7 +120,7 @@ function DiscoverPageContent() {
     {
       id: "agent_customer_service",
       name: "Customer Service",
-      avatar: "🎧",
+      avatar: "https://api.dicebear.com/7.x/lorelei/svg?seed=customerservice&backgroundColor=d1fae5",
       avatarBg: "bg-emerald-100/80",
       description: "Friendly, professional customer service specialist for any industry — handling inquiries, complaints, and ticket resolution.",
       category: "Customer Support",
@@ -119,7 +131,7 @@ function DiscoverPageContent() {
     {
       id: "agent_threat_intel",
       name: "Threat Intelligence Analyst",
-      avatar: "🛡️",
+      avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=threatintel&backgroundColor=f3e8ff",
       avatarBg: "bg-purple-100/80",
       description: "Cyber threat intelligence specialist who tracks adversary groups, maps attack campaigns to MITRE ATT&CK, and assesses risk.",
       category: "IT & Security",
@@ -130,7 +142,7 @@ function DiscoverPageContent() {
     {
       id: "agent_compliance_auditor",
       name: "Compliance Auditor",
-      avatar: "📋",
+      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=compliance&backgroundColor=ecfccb",
       avatarBg: "bg-lime-100/80",
       description: "Expert technical compliance auditor specializing in SOC 2, ISO 27001, HIPAA, and PCI-DSS audits and control testing.",
       category: "IT & Security",
@@ -141,7 +153,7 @@ function DiscoverPageContent() {
     {
       id: "agent_security_architect",
       name: "Security Architect",
-      avatar: "🏰",
+      avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=securityarch&backgroundColor=fce7f3",
       avatarBg: "bg-pink-100/80",
       description: "Expert security architect specializing in threat modeling, secure-by-design architecture, trust boundaries, and zero-trust systems.",
       category: "IT & Security",
@@ -152,7 +164,7 @@ function DiscoverPageContent() {
     {
       id: "agent_video_opt",
       name: "Video Optimization Specialist",
-      avatar: "🎬",
+      avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=videoopt&backgroundColor=ffe4e6",
       avatarBg: "bg-rose-100/80",
       description: "Video marketing strategist specializing in YouTube algorithm optimization, audience retention, and high-CTR hooks.",
       category: "Content Creation",
@@ -163,7 +175,7 @@ function DiscoverPageContent() {
     {
       id: "agent_brand_guardian",
       name: "Brand Guardian",
-      avatar: "💎",
+      avatar: "https://api.dicebear.com/7.x/lorelei/svg?seed=brandguardian&backgroundColor=e0e7ff",
       avatarBg: "bg-indigo-100/80",
       description: "Expert brand strategist and guardian specializing in brand identity development, consistency enforcement, and tone of voice.",
       category: "Design",
@@ -174,7 +186,7 @@ function DiscoverPageContent() {
     {
       id: "agent_whimsy_injector",
       name: "Whimsy Injector",
-      avatar: "✨",
+      avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=whimsyinjector&backgroundColor=fae8ff",
       avatarBg: "bg-fuchsia-100/80",
       description: "Expert creative specialist focused on adding personality, delight, and playful elements to brand copy and user journeys.",
       category: "Marketing",
@@ -185,7 +197,7 @@ function DiscoverPageContent() {
     {
       id: "agent_incident_responder",
       name: "Incident Responder",
-      avatar: "🚨",
+      avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=incidentresponder&backgroundColor=cffafe",
       avatarBg: "bg-cyan-100/80",
       description: "Digital forensics and incident response specialist who leads breach investigations, contains active threats, and hardens systems.",
       category: "IT & Security",
@@ -196,7 +208,7 @@ function DiscoverPageContent() {
     {
       id: "agent_secops_engineer",
       name: "Senior SecOps Engineer",
-      avatar: "💻",
+      avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=secops&backgroundColor=fef3c7",
       avatarBg: "bg-amber-100/80",
       description: "Defensive application security specialist who scans every code submission for secrets, vulnerable dependencies, and logic flaws.",
       category: "IT & Security",
@@ -207,7 +219,7 @@ function DiscoverPageContent() {
     {
       id: "agent_threat_detection",
       name: "Threat Detection Engineer",
-      avatar: "📡",
+      avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=threatdetection&backgroundColor=ccfbf1",
       avatarBg: "bg-teal-100/80",
       description: "Expert detection engineer specializing in SIEM rule development, MITRE ATT&CK coverage mapping, and alert triage automation.",
       category: "IT & Security",
@@ -218,9 +230,9 @@ function DiscoverPageContent() {
     {
       id: "agent_influencer_scout",
       name: "Influencer Scout",
-      avatar: "📱",
+      avatar: "https://api.dicebear.com/7.x/lorelei/svg?seed=influencerscout&backgroundColor=fce7f3",
       avatarBg: "bg-pink-100/80",
-      description: "Teamily's official KOL/Creator partnership screening advisor. Based on influencer metrics, engagement ratios, and brand affinity.",
+      description: "Abrazy's official KOL/Creator partnership screening advisor. Based on influencer metrics, engagement ratios, and brand affinity.",
       category: "Marketing",
       tags: ["kol", "creator", "influencer", "outreach"],
       createdBy: "official",
@@ -229,7 +241,7 @@ function DiscoverPageContent() {
     {
       id: "agent_game_designer",
       name: "Game Designer",
-      avatar: "🎮",
+      avatar: "https://api.dicebear.com/7.x/adventurer/svg?seed=gamedesigner&backgroundColor=fef9c3",
       avatarBg: "bg-yellow-100/80",
       description: "Systems and mechanics architect - Masters GDD authorship, player psychology, economy balancing, and gameplay loops.",
       category: "Engineering",
@@ -240,7 +252,7 @@ function DiscoverPageContent() {
     {
       id: "agent_appsec_engineer",
       name: "Application Security Engineer",
-      avatar: "🔒",
+      avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=appsec&backgroundColor=e0f2fe",
       avatarBg: "bg-sky-100/80",
       description: "AppSec specialist who secures the software development lifecycle through threat modeling, SAST/DAST reviews, and security pipelines.",
       category: "IT & Security",
@@ -251,7 +263,7 @@ function DiscoverPageContent() {
     {
       id: "agent_penetration_tester",
       name: "Penetration Tester",
-      avatar: "🎯",
+      avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=pentester&backgroundColor=ffe4e6",
       avatarBg: "bg-rose-100/80",
       description: "Offensive security specialist conducting authorized penetration tests, red team operations, and vulnerability assessments.",
       category: "IT & Security",
@@ -262,7 +274,7 @@ function DiscoverPageContent() {
     {
       id: "agent_cloud_sec_architect",
       name: "Cloud Security Architect",
-      avatar: "☁️",
+      avatar: "https://api.dicebear.com/7.x/bottts/svg?seed=cloudsec&backgroundColor=fef3c7",
       avatarBg: "bg-amber-100/80",
       description: "Cloud-native security specialist designing zero trust architectures, implementing defense-in-depth across AWS, GCP, and Azure.",
       category: "IT & Security",
@@ -273,7 +285,7 @@ function DiscoverPageContent() {
     {
       id: "agent_content_strategist",
       name: "Content Strategist & SEO",
-      avatar: "✍️",
+      avatar: "https://api.dicebear.com/7.x/lorelei/svg?seed=contentseo&backgroundColor=ccfbf1",
       avatarBg: "bg-teal-100/80",
       description: "Strategic growth hacker driving search intent analysis, programmatic SEO architectures, and viral blog conversions.",
       category: "Content Creation",
@@ -284,7 +296,7 @@ function DiscoverPageContent() {
     {
       id: "agent_legal_counsel",
       name: "Legal Contract Reviewer",
-      avatar: "⚖️",
+      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=legalcounsel&backgroundColor=e0f2fe",
       avatarBg: "bg-blue-100/80",
       description: "Analyzes NDAs, master services agreements, enterprise software licenses, and liability clauses with strict jurisdictional accuracy.",
       category: "Legal",
@@ -295,7 +307,7 @@ function DiscoverPageContent() {
     {
       id: "agent_data_analyst",
       name: "Lead Data Scientist",
-      avatar: "📊",
+      avatar: "https://api.dicebear.com/7.x/notionists/svg?seed=datascientist&backgroundColor=f3e8ff",
       avatarBg: "bg-purple-100/80",
       description: "Transforms messy raw data into predictive machine learning pipelines, BigQuery SQL data models, and executive dashboards.",
       category: "Data Analysis",
@@ -622,7 +634,7 @@ function DiscoverPageContent() {
                   : "bg-slate-100 text-slate-600 hover:bg-slate-200"
               }`}
             >
-              By Teamily AI
+              By Abrazy AI
             </button>
             <button
               onClick={() => setSourceFilter("custom")}
@@ -717,21 +729,34 @@ function DiscoverPageContent() {
                       {/* Left: Avatar with pastel circle */}
                       <div className="relative flex-shrink-0">
                         <div
-                          className={`w-12 h-12 rounded-full ${
+                          className={`w-12 h-12 rounded-full overflow-hidden ${
                             agent.avatarBg || "bg-emerald-100/80"
                           } flex items-center justify-center text-2xl shadow-xs`}
                         >
-                          {agent.avatar}
+                          {agent.avatar && agent.avatar.startsWith("http") ? (
+                            <img
+                              src={agent.avatar}
+                              alt={agent.name}
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLElement).style.display = "none";
+                              }}
+                            />
+                          ) : (
+                            <span>{agent.avatar}</span>
+                          )}
                         </div>
                         {/* Little badge icon at bottom right of avatar */}
-                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white rounded-full border border-slate-200 flex items-center justify-center text-[10px] shadow-xs">
-                          {agent.category === "IT & Security"
-                            ? "🛡️"
-                            : agent.category === "Finance"
-                            ? "🪙"
-                            : agent.category === "Content Creation"
-                            ? "🎬"
-                            : "⚡"}
+                        <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 bg-white rounded-full border border-slate-200 flex items-center justify-center shadow-xs">
+                          {agent.category === "IT & Security" ? (
+                            <Shield className="w-2.5 h-2.5 text-indigo-600" />
+                          ) : agent.category === "Finance" ? (
+                            <Coins className="w-2.5 h-2.5 text-amber-600" />
+                          ) : agent.category === "Content Creation" ? (
+                            <Video className="w-2.5 h-2.5 text-rose-600" />
+                          ) : (
+                            <Zap className="w-2.5 h-2.5 text-emerald-600" />
+                          )}
                         </div>
                       </div>
 
@@ -848,7 +873,9 @@ function DiscoverPageContent() {
             {/* Header */}
             <div className="flex items-center justify-between border-b border-slate-100 pb-3">
               <div className="flex items-center gap-2">
-                <span className="text-2xl">🤖</span>
+                <div className="w-9 h-9 rounded-xl bg-emerald-50 border border-emerald-200 flex items-center justify-center">
+                  <Bot className="w-5 h-5 text-[#00D35A]" />
+                </div>
                 <div>
                   <h3 className="font-bold text-slate-900 text-base">Create My Own Agent</h3>
                   <p className="text-xs text-slate-500">Configure your custom autonomous specialist</p>
@@ -912,20 +939,20 @@ function DiscoverPageContent() {
 
               {/* Avatar Selector */}
               <div>
-                <label className="block font-semibold text-slate-700 mb-1.5">Avatar Style</label>
-                <div className="flex items-center gap-2">
-                  {["🤖", "⚡", "🛡️", "💼", "🎨", "📊", "🎬", "🚀", "⚖️", "🐍"].map((em) => (
+                <label className="block font-semibold text-slate-700 mb-1.5">Avatar Style (3D Portrait)</label>
+                <div className="flex items-center gap-2 overflow-x-auto pb-1">
+                  {AVATAR_PRESETS.map((presetUrl, idx) => (
                     <button
-                      key={em}
+                      key={idx}
                       type="button"
-                      onClick={() => setNewAgentAvatar(em)}
-                      className={`w-9 h-9 rounded-full flex items-center justify-center text-lg border transition ${
-                        newAgentAvatar === em
-                          ? "border-[#00D35A] ring-2 ring-emerald-300/50 bg-emerald-50"
-                          : "border-slate-200 hover:bg-slate-50"
+                      onClick={() => setNewAgentAvatar(presetUrl)}
+                      className={`w-10 h-10 rounded-full overflow-hidden border-2 transition-all flex-shrink-0 ${
+                        newAgentAvatar === presetUrl
+                          ? "border-[#00D35A] ring-2 ring-emerald-300/50 scale-105"
+                          : "border-slate-200 hover:border-slate-300 opacity-80 hover:opacity-100"
                       }`}
                     >
-                      {em}
+                      <img src={presetUrl} alt="Avatar Preset" className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>

@@ -8,6 +8,7 @@ export function token(): string | null {
 async function req<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const headers = new Headers(opts.headers);
   const t = token();
+  headers.set("Accept", "application/json");
   if (t) headers.set("Authorization", `Bearer ${t}`);
   if (opts.body) headers.set("Content-Type", "application/json");
   const res = await fetch(`${API_URL}${path}`, { ...opts, headers });
@@ -26,8 +27,11 @@ export const api = {
   updateProfile: (b: any) => req("/api/auth/profile", { method: "PATCH", body: JSON.stringify(b) }),
   sendMagicLink: (b: { email: string }) => req("/api/auth/magic-link", { method: "POST", body: JSON.stringify(b) }),
   verifyMagicLink: (token: string) => req<{ access_token: string; refresh_token: string }>(`/api/auth/magic-link/verify?token=${token}`),
-  oauthConnect: (provider: string) => req<{ url: string }>(`/api/auth/oauth/${provider}/connect`),
+  oauthConnect: (provider: string) => req<{ url: string; dev_mode?: boolean }>(`/api/auth/oauth/${provider}/connect`),
   oauthCallback: (provider: string, code: string, state?: string) => req<{ access_token: string; refresh_token: string }>(`/api/auth/oauth/${provider}/callback?code=${code}${state ? `&state=${state}` : ""}`),
+  sendWhatsAppOtp: (b: { phone: string }) => req<{ status: string; message: string; phone: string; display_phone?: string; dev_otp?: string }>("/api/auth/whatsapp/send-otp", { method: "POST", body: JSON.stringify(b) }),
+  verifyWhatsAppOtp: (b: { phone: string; otp: string }) => req<{ access_token: string; refresh_token: string }>("/api/auth/whatsapp/verify-otp", { method: "POST", body: JSON.stringify(b) }),
+  socialQuickLogin: (b: { provider: string; email?: string; full_name?: string }) => req<{ access_token: string; refresh_token: string }>("/api/auth/social/quick-login", { method: "POST", body: JSON.stringify(b) }),
   // agents
   listAgents: () => req<any[]>("/api/agents"),
   createAgent: (b: any) => req("/api/agents", { method: "POST", body: JSON.stringify(b) }),

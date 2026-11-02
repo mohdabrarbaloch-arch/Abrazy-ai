@@ -35,11 +35,14 @@ export default function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProp
   const [isSaving, setIsSaving] = useState(false);
   const [saveSuccessMsg, setSaveSuccessMsg] = useState(false);
 
-  // Connection dialog modals (Screenshots 3 & 4)
-  const [showConfigModal, setShowConfigModal] = useState(false); // Base URL modal (Supabase)
+  // Connection Configuration Drawer (Real Connection & Sandbox)
+  const [showConnectionDrawer, setShowConnectionDrawer] = useState(false);
+  const [authMethod, setAuthMethod] = useState<"sandbox" | "apikey" | "oauth">("sandbox");
+  const [apiKeyInput, setApiKeyInput] = useState("");
   const [baseUrlInput, setBaseUrlInput] = useState("https://api.supabase.com");
-  const [showOAuthModal, setShowOAuthModal] = useState(false); // Google/Composio OAuth modal (Google Docs)
+  const [accountEmailInput, setAccountEmailInput] = useState("mohdabrarbaloch@gmail.com");
   const [connectingProvider, setConnectingProvider] = useState<string | null>(null);
+  const [connectError, setConnectError] = useState<string | null>(null);
 
   // Sync connected integrations from backend on mount/open
   useEffect(() => {
@@ -130,29 +133,38 @@ export default function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProp
   const enabledToolsCount = currentTools.filter((t) => t.enabled).length;
   const totalToolsCount = currentTools.length;
 
-  // Click Connect on Header
+  // Click Connect on Header -> Open Real Connection Drawer
   const handleOpenConnect = () => {
     const norm = selectedConnector.id.toLowerCase().replace(/[^a-z0-9]/g, "");
     setConnectingProvider(selectedConnector.id);
-
-    // If Supabase or API key service -> Open Base URL modal (Screenshot 3)
     if (norm === "supabase") {
       setBaseUrlInput("https://api.supabase.com");
-      setShowConfigModal(true);
+    } else if (norm === "github") {
+      setBaseUrlInput("https://api.github.com");
+    } else if (norm === "slack") {
+      setBaseUrlInput("https://slack.com/api");
     } else {
-      // Open OAuth Modal (Screenshot 4)
-      setShowOAuthModal(true);
+      setBaseUrlInput(`https://api.${norm}.com`);
     }
+    setApiKeyInput("");
+    setConnectError(null);
+    setShowConnectionDrawer(true);
   };
 
-  // Perform Connection (called by either Base URL modal or OAuth modal)
-  const handleConfirmConnect = async (options?: { baseUrl?: string }) => {
+  // Perform Connection (called with real API key, sandbox token, or custom base URL)
+  const handleConfirmConnect = async (options?: { baseUrl?: string; apiKey?: string }) => {
     const providerId = selectedConnector.id;
     try {
       const res = await directConnectProvider(providerId, {
-        baseUrl: options?.baseUrl,
-        accountEmail: "mohdabrarbaloch@gmail.com",
+        baseUrl: options?.baseUrl || baseUrlInput,
+        apiKey: options?.apiKey || (authMethod === "sandbox" ? "sandbox_live_token" : apiKeyInput),
+        accountEmail: accountEmailInput || "mohdabrarbaloch@gmail.com",
       });
+
+      if (!res.success && res.error) {
+        setConnectError(res.error);
+        return;
+      }
 
       // Update state
       const initialTools = getToolsForConnector(providerId);
@@ -173,11 +185,11 @@ export default function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProp
       }));
 
       setCurrentTools(initialTools);
-    } catch (err) {
+      setShowConnectionDrawer(false);
+    } catch (err: any) {
       console.error("Connect error:", err);
+      setConnectError(err?.message || "Connection failed");
     } finally {
-      setShowConfigModal(false);
-      setShowOAuthModal(false);
       setConnectingProvider(null);
     }
   };
@@ -534,143 +546,167 @@ export default function ConnectorsModal({ isOpen, onClose }: ConnectorsModalProp
         </div>
       </div>
 
-      {/* ================= MODAL: CONNECT BASE URL (Supabase - Image 3) ================= */}
-      {showConfigModal && (
+      {/* ================= REAL CONNECTION CONFIGURATION DRAWER / MODAL ================= */}
+      {showConnectionDrawer && (
         <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in"
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in"
           onClick={(e) => {
             e.stopPropagation();
-            setShowConfigModal(false);
+            setShowConnectionDrawer(false);
           }}
         >
           <div
-            className="bg-white rounded-3xl p-6 shadow-2xl max-w-md w-full border border-gray-100 animate-in zoom-in-95 duration-150"
+            className="bg-white rounded-3xl shadow-2xl max-w-lg w-full border border-slate-200 overflow-hidden animate-in zoom-in-95 duration-150 flex flex-col"
             onClick={(e) => e.stopPropagation()}
           >
-            <h3 className="text-base font-bold text-gray-900">
-              Connect • {selectedConnector.name}
-            </h3>
-
-            <div className="mt-4">
-              <label className="text-xs font-semibold text-gray-700 block mb-1">
-                Base URL <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
-                value={baseUrlInput}
-                onChange={(e) => setBaseUrlInput(e.target.value)}
-                className="w-full px-3.5 py-2.5 rounded-xl border border-gray-200 text-xs text-gray-800 focus:outline-none focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500"
-              />
-              <p className="text-[11px] text-gray-400 mt-2 leading-relaxed">
-                The web address for the Supabase Management API. Most accounts can keep the default
-                https://api.supabase.com — change it only if you self-host Supabase.
-              </p>
+            {/* Header */}
+            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-white shadow-xs border border-slate-200 flex items-center justify-center p-2">
+                  <ConnectorIcon id={selectedConnector.id} className="w-full h-full object-contain" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900">
+                    Connect {selectedConnector.name}
+                  </h3>
+                  <p className="text-xs text-slate-500">
+                    Integrate live tools with Abrazy.ai autonomous brain
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowConnectionDrawer(false)}
+                className="w-8 h-8 rounded-full hover:bg-slate-200/60 text-slate-400 hover:text-slate-700 font-bold flex items-center justify-center transition"
+              >
+                ✕
+              </button>
             </div>
 
-            <div className="mt-6 flex items-center justify-end gap-3">
+            {/* Error Message */}
+            {connectError && (
+              <div className="mx-6 mt-4 p-3 rounded-xl bg-red-50 border border-red-200 text-red-600 text-xs">
+                {connectError}
+              </div>
+            )}
+
+            {/* Body */}
+            <div className="p-6 space-y-4 text-xs">
+              {/* Method Selector */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1.5">Authentication Mode</label>
+                <div className="grid grid-cols-3 gap-2">
+                  <button
+                    type="button"
+                    onClick={() => setAuthMethod("sandbox")}
+                    className={`py-2 px-2.5 rounded-xl text-center font-semibold border transition ${
+                      authMethod === "sandbox"
+                        ? "border-[#00D35A] bg-[#eaf8ee] text-[#00D35A] shadow-xs"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    Sandbox Mode
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMethod("apikey")}
+                    className={`py-2 px-2.5 rounded-xl text-center font-semibold border transition ${
+                      authMethod === "apikey"
+                        ? "border-[#00D35A] bg-[#eaf8ee] text-[#00D35A] shadow-xs"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    API Key
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setAuthMethod("oauth")}
+                    className={`py-2 px-2.5 rounded-xl text-center font-semibold border transition ${
+                      authMethod === "oauth"
+                        ? "border-[#00D35A] bg-[#eaf8ee] text-[#00D35A] shadow-xs"
+                        : "border-slate-200 text-slate-600 hover:bg-slate-50"
+                    }`}
+                  >
+                    OAuth Token
+                  </button>
+                </div>
+              </div>
+
+              {/* Dynamic Fields */}
+              {authMethod === "sandbox" ? (
+                <div className="p-3.5 bg-emerald-50/80 rounded-2xl border border-emerald-200">
+                  <p className="font-semibold text-emerald-900 text-xs">Sandbox Environment Ready</p>
+                  <p className="text-[11px] text-emerald-800 mt-1 leading-relaxed">
+                    Instantly provision simulated tools for {selectedConnector.name} without needing real production API credentials. All actions run in an isolated memory buffer.
+                  </p>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      {authMethod === "apikey" ? "API Key / Secret *" : "Bearer / OAuth Token *"}
+                    </label>
+                    <input
+                      type="password"
+                      placeholder={`Enter your ${selectedConnector.name} secret key...`}
+                      value={apiKeyInput}
+                      onChange={(e) => setApiKeyInput(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-slate-200 rounded-xl outline-none focus:border-[#00D35A] text-slate-900 font-mono text-xs"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block font-semibold text-slate-700 mb-1">
+                      Endpoint / Base URL <span className="text-slate-400 font-normal">(Default provided)</span>
+                    </label>
+                    <input
+                      type="text"
+                      value={baseUrlInput}
+                      onChange={(e) => setBaseUrlInput(e.target.value)}
+                      className="w-full px-3.5 py-2 border border-slate-200 rounded-xl outline-none focus:border-[#00D35A] text-slate-900 text-xs font-mono"
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Account Email */}
+              <div>
+                <label className="block font-semibold text-slate-700 mb-1">Authenticated Account Email</label>
+                <input
+                  type="email"
+                  value={accountEmailInput}
+                  onChange={(e) => setAccountEmailInput(e.target.value)}
+                  className="w-full px-3.5 py-2 border border-slate-200 rounded-xl outline-none focus:border-[#00D35A] text-slate-900 text-xs"
+                />
+              </div>
+            </div>
+
+            {/* Footer Actions */}
+            <div className="p-5 border-t border-slate-100 bg-slate-50 flex items-center justify-between">
               <button
-                onClick={() => setShowConfigModal(false)}
-                className="px-5 py-2 rounded-xl border border-gray-200 text-xs font-medium text-gray-600 hover:bg-gray-50 transition-colors"
+                type="button"
+                onClick={() => setShowConnectionDrawer(false)}
+                className="px-4 py-2 rounded-xl border border-slate-200 text-xs font-medium text-slate-600 hover:bg-white transition"
               >
                 Cancel
               </button>
-              <button
-                onClick={() => handleConfirmConnect({ baseUrl: baseUrlInput })}
-                className="px-6 py-2 rounded-xl bg-[#00D35A] hover:bg-[#00b84e] text-xs font-semibold text-white shadow-sm transition-transform active:scale-95"
-              >
-                Connect
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* ================= MODAL: OAUTH SIGN-IN (Google Docs/Gmail/etc. - Image 4) ================= */}
-      {showOAuthModal && (
-        <div
-          className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in"
-          onClick={(e) => {
-            e.stopPropagation();
-            setShowOAuthModal(false);
-          }}
-        >
-          <div
-            className="bg-white rounded-3xl shadow-2xl max-w-lg w-full border border-gray-100 overflow-hidden animate-in zoom-in-95 duration-150"
-            onClick={(e) => e.stopPropagation()}
-          >
-            {/* Fake Chrome / OAuth Header */}
-            <div className="bg-gray-100 px-4 py-2 border-b border-gray-200 flex items-center justify-between text-xs text-gray-600">
               <div className="flex items-center gap-2">
-                <span className="w-2.5 h-2.5 rounded-full bg-red-400 inline-block" />
-                <span className="w-2.5 h-2.5 rounded-full bg-yellow-400 inline-block" />
-                <span className="w-2.5 h-2.5 rounded-full bg-green-400 inline-block" />
-                <span className="ml-2 font-medium text-gray-700">Sign in with Google</span>
-              </div>
-              <span className="text-[10px] text-gray-400">accounts.google.com</span>
-            </div>
-
-            {/* Content */}
-            <div className="p-8">
-              {/* Composio / Abrazy Badge */}
-              <div className="w-12 h-12 bg-black rounded-xl flex items-center justify-center text-white mb-6">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                  <rect x="3" y="3" width="18" height="18" rx="4" />
-                  <path d="M7 8h10M7 12h10M7 16h6" />
-                </svg>
-              </div>
-
-              <h2 className="text-2xl font-bold text-gray-900 tracking-tight">
-                You&apos;re signing back in to Composio
-              </h2>
-
-              <p className="text-xs text-gray-600 mt-4 leading-relaxed">
-                Review Composio&apos;s <span className="text-blue-600 underline cursor-pointer">Privacy Policy</span> and{" "}
-                <span className="text-blue-600 underline cursor-pointer">Terms of Service</span> to understand how Composio will process and protect your data.
-              </p>
-
-              <p className="text-xs text-gray-600 mt-3 leading-relaxed">
-                To make changes at any time, go to your <span className="text-blue-600 underline cursor-pointer">Google Account</span>.
-              </p>
-
-              {/* Account Selector Card */}
-              <div className="mt-6 p-3 rounded-2xl border border-gray-200 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                <div className="flex items-center gap-3">
-                  <div className="w-8 h-8 rounded-full bg-emerald-700 text-white flex items-center justify-center font-bold text-xs">
-                    M
-                  </div>
-                  <span className="text-xs font-semibold text-gray-800">
-                    mohdabrarbaloch@gmail.com
-                  </span>
-                </div>
-                <svg className="w-4 h-4 text-gray-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z" clipRule="evenodd" />
-                </svg>
-              </div>
-
-              {/* Action Buttons */}
-              <div className="mt-8 flex items-center justify-end gap-3">
+                {authMethod !== "sandbox" && (
+                  <button
+                    type="button"
+                    onClick={() => handleConfirmConnect({ apiKey: "sandbox_token_live", baseUrl: baseUrlInput })}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold text-[#00D35A] bg-[#eaf8ee] hover:bg-emerald-100 transition"
+                  >
+                    Connect Sandbox
+                  </button>
+                )}
                 <button
-                  onClick={() => setShowOAuthModal(false)}
-                  className="px-6 py-2 rounded-full border border-gray-300 text-xs font-medium text-gray-700 hover:bg-gray-50 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
+                  type="button"
                   onClick={() => handleConfirmConnect()}
-                  className="px-7 py-2 rounded-full bg-blue-600 hover:bg-blue-700 text-xs font-semibold text-white shadow-sm transition-transform active:scale-95"
+                  className="px-6 py-2 rounded-xl bg-[#00D35A] hover:bg-[#00be51] text-xs font-semibold text-white shadow-sm transition active:scale-95"
                 >
-                  Continue
+                  Save & Authenticate
                 </button>
-              </div>
-            </div>
-
-            {/* Footer */}
-            <div className="bg-gray-50 px-8 py-3 border-t border-gray-100 flex items-center justify-between text-[11px] text-gray-500">
-              <span>English (United States)</span>
-              <div className="flex gap-4">
-                <span className="hover:underline cursor-pointer">Help</span>
-                <span className="hover:underline cursor-pointer">Privacy</span>
-                <span className="hover:underline cursor-pointer">Terms</span>
               </div>
             </div>
           </div>

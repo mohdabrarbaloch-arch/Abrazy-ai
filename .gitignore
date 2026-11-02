@@ -70,3 +70,9 @@ Thumbs.db
 .idea/
 *.swp
 *.swo
+
+# Kiro agent artifacts (local only)
+.agents/
+
+# Alembic compiled cache
+backend/alembic/__pycache__/
