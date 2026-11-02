@@ -112,29 +112,29 @@ async def run_agent(
 
     for round_num in range(max_tool_rounds + 1):
         buf = ""
+        pending_tool_calls: list = []  # collect ToolCall objects from chunks
+
         async for chunk in adapter.complete(messages, model=model, tools=schemas if schemas else None, stream=True):
+            if chunk.tool_calls:
+                pending_tool_calls.extend(chunk.tool_calls)
             if chunk.delta:
                 buf += chunk.delta
-                final_text = buf  # last text wins
+                final_text = buf
                 emit({"type": "token", "delta": chunk.delta})
 
-        # Tool calling detection
-        if schemas and _contains_tool_request(buf):
-            call = _parse_tool_request(buf)
-            if call:
-                tool_name = call["name"]
-                tool_args = call["args"]
+        if pending_tool_calls:
+            # Execute each tool call
+            for tc in pending_tool_calls:
+                tool_name = tc.name
+                tool_args = tc.arguments if isinstance(tc.arguments, dict) else {}
 
-                emit(
-                    {
-                        "type": "tool",
-                        "name": tool_name,
-                        "args": tool_args,
-                        "round": round_num + 1,
-                    }
-                )
+                emit({
+                    "type": "tool_start",
+                    "name": tool_name,
+                    "args": tool_args,
+                    "round": round_num + 1,
+                })
 
-                # Route tool call: internal or external MCP
                 try:
                     result = await _execute_tool(
                         tool_name=tool_name,
@@ -143,38 +143,28 @@ async def run_agent(
                         db=db,
                         mcp_tool_names=[t["name"] for t in mcp_tools],
                     )
+                    emit({"type": "tool_done", "name": tool_name, "result": result})
 
-                    emit({"type": "tool_result", "name": tool_name, "result": result})
-
-                    # Feed result back to LLM
-                    messages.append(
-                        Message(
-                            role="assistant",
-                            content=f"I called tool '{tool_name}' and received: {json.dumps(result, ensure_ascii=False)}",
-                        )
-                    )
-                    messages.append(
-                        Message(
-                            role="user",
-                            content="Continue with the task based on the tool result. Provide a clear, concise response.",
-                        )
-                    )
-                    continue
-
+                    # Feed result back as tool role message (OpenAI tool message format)
+                    messages.append(Message(role="assistant", content=buf or ""))
+                    messages.append(Message(
+                        role="tool",
+                        content=json.dumps(result, ensure_ascii=False),
+                        tool_call_id=tc.id,
+                    ))
                 except Exception as e:
                     error_msg = f"Tool execution failed: {str(e)}"
                     logger.exception(f"❌ {error_msg}")
                     emit({"type": "error", "message": error_msg})
-
                     messages.append(
                         Message(
                             role="user",
                             content=f"Tool '{tool_name}' failed: {str(e)}. Please try a different approach or inform the user.",
                         )
                     )
-                    continue
+            continue  # next round with tool results injected
 
-        # No more tool calls - done
+        # No tool calls — model is done
         emit({"type": "done", "message": final_text})
         return final_text
 
@@ -220,19 +210,4 @@ async def _execute_tool(
     logger.error(f"❌ Tool not found: {tool_name}")
     return {"error": f"Tool '{tool_name}' not found"}
 
-
-def _contains_tool_request(text: str) -> bool:
-    """Check if text contains a tool call marker."""
-    return "<<tool" in text and ">>" in text
-
-
-def _parse_tool_request(text: str) -> dict | None:
-    """Parse tool call from text."""
-    try:
-        start = text.index("<<tool") + 6
-        end = text.index(">>", start)
-        payload = text[start:end].strip()
-        return json.loads(payload)
-    except (ValueError, json.JSONDecodeError):
-        return None
 

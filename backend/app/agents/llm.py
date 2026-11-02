@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import AsyncIterator
+from typing import Any, AsyncIterator
 
 import httpx
 
@@ -75,6 +75,21 @@ class OllamaAdapter(LLMAdapter):
                 r = await c.post(f"{self.base}/api/chat", json=payload)
                 r.raise_for_status()
                 msg = r.json()["message"]
+                raw_tcs = msg.get("tool_calls")
+                if raw_tcs:
+                    tool_calls = [
+                        ToolCall(
+                            id=tc.get("id", tc["function"]["name"]),
+                            name=tc["function"]["name"],
+                            arguments=(
+                                tc["function"]["arguments"]
+                                if isinstance(tc["function"]["arguments"], dict)
+                                else json.loads(tc["function"]["arguments"])
+                            ),
+                        )
+                        for tc in raw_tcs
+                    ]
+                    yield CompletionChunk(tool_calls=tool_calls)
                 yield CompletionChunk(delta=msg.get("content", ""), done=True)
                 return
             async with c.stream("POST", f"{self.base}/api/chat", json=payload) as resp:
@@ -86,7 +101,23 @@ class OllamaAdapter(LLMAdapter):
                     if data.get("done"):
                         yield CompletionChunk(done=True)
                         return
-                    delta = data.get("message", {}).get("content", "")
+                    msg = data.get("message", {})
+                    raw_tcs = msg.get("tool_calls")
+                    if raw_tcs:
+                        tool_calls = [
+                            ToolCall(
+                                id=tc.get("id", tc["function"]["name"]),
+                                name=tc["function"]["name"],
+                                arguments=(
+                                    tc["function"]["arguments"]
+                                    if isinstance(tc["function"]["arguments"], dict)
+                                    else json.loads(tc["function"]["arguments"])
+                                ),
+                            )
+                            for tc in raw_tcs
+                        ]
+                        yield CompletionChunk(tool_calls=tool_calls)
+                    delta = msg.get("content", "")
                     if delta:
                         yield CompletionChunk(delta=delta)
 
@@ -117,17 +148,47 @@ class OpenAIAdapter(LLMAdapter):
         async with httpx.AsyncClient(timeout=120) as c:
             async with c.stream("POST", "https://api.openai.com/v1/chat/completions", json=payload, headers=headers) as resp:
                 resp.raise_for_status()
+                # Accumulate tool call deltas across streaming chunks
+                # Structure: {index: {"id": str, "name": str, "arguments": str}}
+                tc_accum: dict[int, dict] = {}
+                finish_reason = None
                 async for line in resp.aiter_lines():
                     if not line.startswith("data:"):
                         continue
                     chunk = line[5:].strip()
                     if chunk == "[DONE]":
+                        # Yield accumulated tool calls if any
+                        if tc_accum or finish_reason == "tool_calls":
+                            tool_calls = [
+                                ToolCall(
+                                    id=tc.get("id", ""),
+                                    name=tc.get("name", ""),
+                                    arguments=json.loads(tc.get("arguments", "{}") or "{}"),
+                                )
+                                for tc in tc_accum.values()
+                            ]
+                            if tool_calls:
+                                yield CompletionChunk(tool_calls=tool_calls)
                         yield CompletionChunk(done=True)
                         return
                     data = json.loads(chunk)
-                    choice = data["choices"][0]["delta"]
-                    if "content" in choice and choice["content"]:
-                        yield CompletionChunk(delta=choice["content"])
+                    choice = data["choices"][0]
+                    finish_reason = choice.get("finish_reason") or finish_reason
+                    delta = choice["delta"]
+                    # Accumulate tool call argument deltas
+                    for tc_delta in delta.get("tool_calls", []):
+                        idx = tc_delta["index"]
+                        if idx not in tc_accum:
+                            tc_accum[idx] = {"id": "", "name": "", "arguments": ""}
+                        if tc_delta.get("id"):
+                            tc_accum[idx]["id"] = tc_delta["id"]
+                        fn = tc_delta.get("function", {})
+                        if fn.get("name"):
+                            tc_accum[idx]["name"] += fn["name"]
+                        if fn.get("arguments"):
+                            tc_accum[idx]["arguments"] += fn["arguments"]
+                    if "content" in delta and delta["content"]:
+                        yield CompletionChunk(delta=delta["content"])
 
 
 class AnthropicAdapter(LLMAdapter):
@@ -153,15 +214,52 @@ class AnthropicAdapter(LLMAdapter):
         system = next((m.content for m in messages if m.role == "system"), "")
         conv = [{"role": m.role, "content": m.content} for m in messages if m.role != "system"]
         payload = {"model": model, "max_tokens": 1024, "system": system, "messages": conv, "stream": stream}
+        if tools:
+            payload["tools"] = [
+                {
+                    "name": t["name"],
+                    "description": t.get("description", ""),
+                    "input_schema": t.get("parameters", {"type": "object", "properties": {}}),
+                }
+                for t in tools
+            ]
         async with httpx.AsyncClient(timeout=120) as c:
             async with c.stream("POST", "https://api.anthropic.com/v1/messages", json=payload, headers=headers) as resp:
                 resp.raise_for_status()
+                # Accumulate tool use blocks
+                current_tool_id = ""
+                current_tool_name = ""
+                current_tool_args = ""
+                in_tool_block = False
                 async for line in resp.aiter_lines():
                     if not line.startswith("data:"):
                         continue
                     data = json.loads(line[5:].strip())
-                    if data.get("type") == "content_block_delta" and data["delta"].get("text"):
-                        yield CompletionChunk(delta=data["delta"]["text"])
+                    event_type = data.get("type", "")
+                    if event_type == "content_block_start":
+                        cb = data.get("content_block", {})
+                        if cb.get("type") == "tool_use":
+                            in_tool_block = True
+                            current_tool_id = cb.get("id", "")
+                            current_tool_name = cb.get("name", "")
+                            current_tool_args = ""
+                    elif event_type == "content_block_delta":
+                        delta = data.get("delta", {})
+                        if delta.get("type") == "input_json_delta":
+                            current_tool_args += delta.get("partial_json", "")
+                        elif delta.get("type") == "text_delta" and delta.get("text"):
+                            yield CompletionChunk(delta=delta["text"])
+                    elif event_type == "message_delta":
+                        stop_reason = data.get("delta", {}).get("stop_reason")
+                        if stop_reason == "tool_use" and in_tool_block:
+                            try:
+                                args = json.loads(current_tool_args) if current_tool_args else {}
+                            except json.JSONDecodeError:
+                                args = {}
+                            yield CompletionChunk(
+                                tool_calls=[ToolCall(id=current_tool_id, name=current_tool_name, arguments=args)]
+                            )
+                            in_tool_block = False
 
 
 class GroqAdapter(LLMAdapter):
@@ -206,7 +304,19 @@ class GroqAdapter(LLMAdapter):
                             continue  # Try fallback model
                         resp.raise_for_status()
                         data = resp.json()
-                        content = data["choices"][0]["message"].get("content", "")
+                        msg = data["choices"][0]["message"]
+                        raw_tcs = msg.get("tool_calls")
+                        if raw_tcs:
+                            tool_calls = [
+                                ToolCall(
+                                    id=tc["id"],
+                                    name=tc["function"]["name"],
+                                    arguments=json.loads(tc["function"]["arguments"]),
+                                )
+                                for tc in raw_tcs
+                            ]
+                            yield CompletionChunk(tool_calls=tool_calls)
+                        content = msg.get("content", "")
                         yield CompletionChunk(delta=content, done=True)
                         return
 
@@ -217,19 +327,46 @@ class GroqAdapter(LLMAdapter):
                                 last_error = err_body.decode()
                                 continue  # Try fallback model
                         resp.raise_for_status()
+                        tc_accum: dict[int, dict] = {}
+                        finish_reason = None
                         async for line in resp.aiter_lines():
                             if not line.startswith("data:"):
                                 continue
                             chunk = line[5:].strip()
                             if chunk == "[DONE]":
+                                if tc_accum or finish_reason == "tool_calls":
+                                    tool_calls = [
+                                        ToolCall(
+                                            id=tc.get("id", ""),
+                                            name=tc.get("name", ""),
+                                            arguments=json.loads(tc.get("arguments", "{}") or "{}"),
+                                        )
+                                        for tc in tc_accum.values()
+                                    ]
+                                    if tool_calls:
+                                        yield CompletionChunk(tool_calls=tool_calls)
                                 yield CompletionChunk(done=True)
                                 return
                             data = json.loads(chunk)
                             choices = data.get("choices", [])
-                            if choices and "delta" in choices[0]:
-                                choice = choices[0]["delta"]
-                                if "content" in choice and choice["content"]:
-                                    yield CompletionChunk(delta=choice["content"])
+                            if not choices:
+                                continue
+                            choice = choices[0]
+                            finish_reason = choice.get("finish_reason") or finish_reason
+                            delta = choice.get("delta", {})
+                            for tc_delta in delta.get("tool_calls", []):
+                                idx = tc_delta["index"]
+                                if idx not in tc_accum:
+                                    tc_accum[idx] = {"id": "", "name": "", "arguments": ""}
+                                if tc_delta.get("id"):
+                                    tc_accum[idx]["id"] = tc_delta["id"]
+                                fn = tc_delta.get("function", {})
+                                if fn.get("name"):
+                                    tc_accum[idx]["name"] += fn["name"]
+                                if fn.get("arguments"):
+                                    tc_accum[idx]["arguments"] += fn["arguments"]
+                            if "content" in delta and delta["content"]:
+                                yield CompletionChunk(delta=delta["content"])
                         return  # Successfully finished streaming
             except Exception as e:
                 last_error = e
@@ -267,6 +404,8 @@ class GeminiAdapter(LLMAdapter):
         payload: dict[str, Any] = {"contents": contents}
         if system_instruction:
             payload["system_instruction"] = system_instruction
+        if tools:
+            payload["tools"] = [{"function_declarations": tools}]
 
         url = f"https://generativelanguage.googleapis.com/v1beta/models/{model}:streamGenerateContent?alt=sse&key={self.api_key}"
 
@@ -286,7 +425,18 @@ class GeminiAdapter(LLMAdapter):
                             content = candidates[0].get("content", {})
                             parts = content.get("parts", [])
                             for part in parts:
-                                if "text" in part and part["text"]:
+                                fc = part.get("functionCall")
+                                if fc:
+                                    yield CompletionChunk(
+                                        tool_calls=[
+                                            ToolCall(
+                                                id=fc.get("name", ""),
+                                                name=fc["name"],
+                                                arguments=fc.get("args", {}),
+                                            )
+                                        ]
+                                    )
+                                elif "text" in part and part["text"]:
                                     yield CompletionChunk(delta=part["text"])
                     except Exception:
                         continue

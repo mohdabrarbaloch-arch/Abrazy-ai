@@ -3,7 +3,6 @@ import pytest
 
 from app.agents import tools as toolmod
 from app.agents.llm import get_adapter
-from app.agents.orchestrator import _contains_tool_request, _parse_tool_request
 from app.core.config import settings
 
 
@@ -45,15 +44,3 @@ def test_email_tool_unconfigured_safe():
     out = asyncio.run(toolmod.EmailTool().run({"to": "a@b.c", "subject": "s", "body": "b"}, user_id="u1", db=None))
     assert '"ok": false' in out
 
-
-def test_orchestrator_detects_tool_request():
-    text = "I will call <<tool {\"name\": \"web_search\", \"arguments\": {\"query\": \"x\"}}>> now"
-    assert _contains_tool_request(text)
-    call = _parse_tool_request(text)
-    assert call["name"] == "web_search"
-    assert call["arguments"] == {"query": "x"}
-
-
-def test_orchestrator_ignores_plain_text():
-    assert not _contains_tool_request("just a normal reply")
-    assert _parse_tool_request("no tool here") is None
