@@ -14,7 +14,7 @@ function AuthVerifyContent() {
 
       if (!token) {
         setError("Invalid or missing verification token");
-        setTimeout(() => router.push("/login"), 3000);
+        setTimeout(() => router.push("/auth/login"), 3000);
         return;
       }
 
@@ -25,7 +25,7 @@ function AuthVerifyContent() {
         router.push("/dashboard");
       } catch (e: any) {
         setError(e.message || "Verification failed");
-        setTimeout(() => router.push("/login"), 3000);
+        setTimeout(() => router.push("/auth/login"), 3000);
       }
     };
 

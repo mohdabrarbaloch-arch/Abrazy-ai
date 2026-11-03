@@ -21,8 +21,8 @@ _engine_kwargs: dict = {
 
 _db_url = settings.DATABASE_URL
 if _db_url.startswith("postgresql"):
-    # Enable SSL for cloud databases (Neon, Supabase, etc.)
-    _engine_kwargs["connect_args"] = {"ssl": "require"}
+    # psycopg3 uses sslmode in connect_args (not ssl="require")
+    _engine_kwargs["connect_args"] = {"sslmode": "require"}
     # Use connection pooling-friendly settings for Neon's pooler
     _engine_kwargs["pool_size"] = 5
     _engine_kwargs["max_overflow"] = 10

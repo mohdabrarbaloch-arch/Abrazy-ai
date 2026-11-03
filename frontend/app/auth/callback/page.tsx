@@ -37,18 +37,13 @@ function AuthCallbackContent() {
       }
 
       try {
-        let result: { access_token: string; refresh_token?: string };
-        try {
-          result = await api.oauthCallback(provider, code, state || undefined);
-        } catch {
-          result = await api.socialQuickLogin({ provider });
-        }
+        const result = await api.oauthCallback(provider, code, state || undefined);
         localStorage.setItem("token", result.access_token);
         if (result.refresh_token) localStorage.setItem("refresh_token", result.refresh_token);
         router.push("/dashboard");
       } catch (e: any) {
         setError(e.message || "Authentication failed");
-        setTimeout(() => router.push("/login"), 3000);
+        setTimeout(() => router.push("/auth/login"), 3000);
       }
     };
 

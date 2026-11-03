@@ -318,7 +318,7 @@ async def run_automation_now(
     }
 
 
-@router.delete("/{automation_id}", status_code=204)
+@router.delete("/{automation_id}", status_code=204, response_model=None)
 async def delete_automation(
     automation_id: str,
     session: AsyncSession = Depends(get_session),
