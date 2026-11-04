@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../lib/api";
 import Link from "next/link";
-import { signIn } from "next-auth/react";
+import { useGoogleLogin } from "@react-oauth/google";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -82,49 +82,36 @@ export default function LoginPage() {
     }
   }
 
-  // Google OAuth via NextAuth popup
-  async function handleGoogleOAuth() {
-    setErr("");
-    setSocialLoading("google");
-    try {
-      // Open Google popup
-      const result = await signIn("google", { 
-        popup: true,
-        redirect: false,
-        callbackUrl: "/auth/login"
-      });
-      
-      if (result?.error) {
-        setErr("Google sign-in failed. Please try again.");
-        return;
-      }
-      
-      // Get the NextAuth session which has the Google user info
-      // Then register/login on our backend
-      const session = await fetch("/api/auth/session").then(r => r.json());
-      if (session?.user?.email) {
-        const email = session.user.email;
-        const name = session.user.name || email.split("@")[0];
-        
-        // Try login first, if fails register
+
+  // googleLogin hook (replaces handleGoogleOAuth)
+  const googleLogin = useGoogleLogin({
+    flow: "implicit",
+    onSuccess: async (tokenResponse) => {
+      setSocialLoading("google");
+      try {
+        // Get user info from Google
+        const userInfo = await fetch("https://www.googleapis.com/oauth2/v3/userinfo", {
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
+        }).then(r => r.json());
+
+        const email = userInfo.email;
+        const name = userInfo.name || email.split("@")[0];
+        const googlePassword = `google_${userInfo.sub}`;
+
+        // Try login first
         try {
-          const r = await api.login({ email, password: `google_oauth_${email}` });
+          const r = await api.login({ email, password: googlePassword });
           localStorage.setItem("token", r.access_token);
           if (r.refresh_token) localStorage.setItem("refresh_token", r.refresh_token);
         } catch {
-          // User doesn't exist, register them
-          try {
-            await api.register({ email, password: `google_oauth_${email}`, full_name: name });
-            const r = await api.login({ email, password: `google_oauth_${email}` });
-            localStorage.setItem("token", r.access_token);
-            if (r.refresh_token) localStorage.setItem("refresh_token", r.refresh_token);
-          } catch (regErr: any) {
-            setErr(regErr.message || "Failed to create account");
-            return;
-          }
+          // Register new user
+          await api.register({ email, password: googlePassword, full_name: name });
+          const r = await api.login({ email, password: googlePassword });
+          localStorage.setItem("token", r.access_token);
+          if (r.refresh_token) localStorage.setItem("refresh_token", r.refresh_token);
         }
-        
-        // Check onboarding
+
+        // Check onboarding status
         try {
           const me = await api.me() as any;
           if (me?.user_metadata?.onboarding_complete) {
@@ -135,13 +122,17 @@ export default function LoginPage() {
         } catch {
           router.push("/onboarding");
         }
+      } catch (e: any) {
+        setErr(e.message || "Google sign-in failed");
+      } finally {
+        setSocialLoading(null);
       }
-    } catch (e: any) {
+    },
+    onError: () => {
       setErr("Google sign-in failed. Please try again.");
-    } finally {
       setSocialLoading(null);
-    }
-  }
+    },
+  });
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] flex items-center justify-center p-4 relative">
@@ -181,7 +172,7 @@ export default function LoginPage() {
         <button
           type="button"
           disabled={socialLoading !== null}
-          onClick={handleGoogleOAuth}
+          onClick={() => { setErr(""); setSocialLoading("google"); googleLogin(); }}
           className="w-full flex items-center justify-center gap-3 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium text-sm py-2.5 px-4 rounded-full shadow-sm transition-all disabled:opacity-50"
         >
           {socialLoading === "google" ? (
