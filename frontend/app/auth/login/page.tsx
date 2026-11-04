@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { api } from "../../../lib/api";
 import Link from "next/link";
+import { signIn } from "next-auth/react";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -63,7 +64,7 @@ export default function LoginPage() {
     }
   }
 
-  // Google / OAuth Handler — go directly to provider redirect
+  // Google / OAuth Handler — go directly to provider redirect (kept for GitHub etc.)
   async function handleOAuth(provider: string) {
     setErr("");
     setSocialLoading(provider);
@@ -76,6 +77,67 @@ export default function LoginPage() {
       throw new Error("No redirect URL received from server");
     } catch (e: any) {
       setErr(`Sign-in with ${provider} failed: ${e.message}`);
+    } finally {
+      setSocialLoading(null);
+    }
+  }
+
+  // Google OAuth via NextAuth popup
+  async function handleGoogleOAuth() {
+    setErr("");
+    setSocialLoading("google");
+    try {
+      // Open Google popup
+      const result = await signIn("google", { 
+        popup: true,
+        redirect: false,
+        callbackUrl: "/auth/login"
+      });
+      
+      if (result?.error) {
+        setErr("Google sign-in failed. Please try again.");
+        return;
+      }
+      
+      // Get the NextAuth session which has the Google user info
+      // Then register/login on our backend
+      const session = await fetch("/api/auth/session").then(r => r.json());
+      if (session?.user?.email) {
+        const email = session.user.email;
+        const name = session.user.name || email.split("@")[0];
+        
+        // Try login first, if fails register
+        try {
+          const r = await api.login({ email, password: `google_oauth_${email}` });
+          localStorage.setItem("token", r.access_token);
+          if (r.refresh_token) localStorage.setItem("refresh_token", r.refresh_token);
+        } catch {
+          // User doesn't exist, register them
+          try {
+            await api.register({ email, password: `google_oauth_${email}`, full_name: name });
+            const r = await api.login({ email, password: `google_oauth_${email}` });
+            localStorage.setItem("token", r.access_token);
+            if (r.refresh_token) localStorage.setItem("refresh_token", r.refresh_token);
+          } catch (regErr: any) {
+            setErr(regErr.message || "Failed to create account");
+            return;
+          }
+        }
+        
+        // Check onboarding
+        try {
+          const me = await api.me() as any;
+          if (me?.user_metadata?.onboarding_complete) {
+            router.push("/chat");
+          } else {
+            router.push("/onboarding");
+          }
+        } catch {
+          router.push("/onboarding");
+        }
+      }
+    } catch (e: any) {
+      setErr("Google sign-in failed. Please try again.");
     } finally {
       setSocialLoading(null);
     }
@@ -119,7 +181,7 @@ export default function LoginPage() {
         <button
           type="button"
           disabled={socialLoading !== null}
-          onClick={() => handleOAuth("google")}
+          onClick={handleGoogleOAuth}
           className="w-full flex items-center justify-center gap-3 border border-gray-300 bg-white hover:bg-gray-50 text-gray-700 font-medium text-sm py-2.5 px-4 rounded-full shadow-sm transition-all disabled:opacity-50"
         >
           {socialLoading === "google" ? (
