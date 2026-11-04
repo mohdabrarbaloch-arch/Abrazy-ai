@@ -83,19 +83,21 @@ async def me(user: User = Depends(get_current_user)):
 
 @router.patch("/profile", response_model=UserOut)
 async def update_profile(body: dict, user: User = Depends(get_current_user), db: AsyncSession = Depends(get_db)):
-    """Update user profile with onboarding data"""
-    if not user.user_metadata:
-        user.user_metadata = {}
-
-    user.user_metadata.update({
-        "role": body.get("role"),
-        "use_case": body.get("useCase"),
-        "team_size": body.get("teamSize"),
-        "interests": body.get("interests", []),
-        "onboarded": True,
-        "onboarded_at": datetime.now(timezone.utc).isoformat()
-    })
-
+    """Update user profile — merges body into user_metadata."""
+    import copy
+    current_meta = copy.deepcopy(user.user_metadata or {})
+    # If body has user_metadata key, merge it in
+    if "user_metadata" in body:
+        current_meta.update(body["user_metadata"])
+    else:
+        current_meta.update(body)
+    current_meta["updated_at"] = datetime.now(timezone.utc).isoformat()
+    user.user_metadata = current_meta
+    # Update full_name if provided
+    if body.get("full_name"):
+        user.full_name = body["full_name"]
+    from sqlalchemy.orm.attributes import flag_modified
+    flag_modified(user, "user_metadata")
     await db.commit()
     await db.refresh(user)
     return user
@@ -162,11 +164,100 @@ async def oauth_callback(
     state: Optional[str] = Query(None),
     db: AsyncSession = Depends(get_db)
 ):
-    """Handle OAuth callback — code exchange not yet implemented."""
-    raise HTTPException(
-        status_code=501,
-        detail="OAuth code exchange not yet implemented. Please use email login."
-    )
+    """Handle OAuth callback — exchange code for user profile and issue JWT."""
+    import urllib.request
+    import urllib.parse
+    import json as json_lib
+
+    provider_lower = provider.lower()
+
+    if "google" in provider_lower:
+        # Exchange code for tokens
+        token_data = urllib.parse.urlencode({
+            "code": code,
+            "client_id": settings.GOOGLE_CLIENT_ID,
+            "client_secret": settings.GOOGLE_CLIENT_SECRET,
+            "redirect_uri": f"{settings.BACKEND_URL}/api/auth/oauth/google/callback",
+            "grant_type": "authorization_code",
+        }).encode()
+        try:
+            req = urllib.request.Request("https://oauth2.googleapis.com/token", data=token_data, method="POST")
+            resp = urllib.request.urlopen(req, timeout=10)
+            token_resp = json_lib.loads(resp.read())
+            access_token_google = token_resp.get("access_token")
+            # Get user info
+            user_req = urllib.request.Request(
+                "https://www.googleapis.com/oauth2/v2/userinfo",
+                headers={"Authorization": f"Bearer {access_token_google}"}
+            )
+            user_resp = urllib.request.urlopen(user_req, timeout=10)
+            user_info = json_lib.loads(user_resp.read())
+            email = user_info.get("email")
+            full_name = user_info.get("name", email.split("@")[0] if email else "User")
+        except Exception as e:
+            redirect_url = f"{settings.FRONTEND_URL}/auth/callback?error=google_exchange_failed"
+            return RedirectResponse(url=redirect_url)
+
+    elif "github" in provider_lower:
+        token_data = urllib.parse.urlencode({
+            "client_id": settings.GITHUB_CLIENT_ID,
+            "client_secret": settings.GITHUB_CLIENT_SECRET,
+            "code": code,
+            "redirect_uri": f"{settings.BACKEND_URL}/api/auth/oauth/github/callback",
+        }).encode()
+        try:
+            req = urllib.request.Request(
+                "https://github.com/login/oauth/access_token",
+                data=token_data,
+                headers={"Accept": "application/json"},
+                method="POST"
+            )
+            resp = urllib.request.urlopen(req, timeout=10)
+            token_resp = json_lib.loads(resp.read())
+            access_token_github = token_resp.get("access_token")
+            user_req = urllib.request.Request(
+                "https://api.github.com/user",
+                headers={"Authorization": f"Bearer {access_token_github}", "Accept": "application/json"}
+            )
+            user_resp = urllib.request.urlopen(user_req, timeout=10)
+            user_info = json_lib.loads(user_resp.read())
+            email = user_info.get("email")
+            if not email:
+                # GitHub may hide email — fetch from emails endpoint
+                email_req = urllib.request.Request(
+                    "https://api.github.com/user/emails",
+                    headers={"Authorization": f"Bearer {access_token_github}", "Accept": "application/json"}
+                )
+                email_resp = urllib.request.urlopen(email_req, timeout=10)
+                emails = json_lib.loads(email_resp.read())
+                primary = next((e["email"] for e in emails if e.get("primary")), None)
+                email = primary or f"github_{user_info.get('id')}@abrazy.ai"
+            full_name = user_info.get("name") or user_info.get("login", "User")
+        except Exception as e:
+            redirect_url = f"{settings.FRONTEND_URL}/auth/callback?error=github_exchange_failed"
+            return RedirectResponse(url=redirect_url)
+    else:
+        raise HTTPException(status_code=400, detail=f"Provider '{provider}' not supported")
+
+    # Find or create user
+    user = (await db.execute(select(User).where(User.email == email))).scalar_one_or_none()
+    if not user:
+        user = User(
+            email=email,
+            hashed_password=hash_password(secrets.token_urlsafe(32)),
+            full_name=full_name,
+            user_metadata={"oauth_provider": provider_lower, "registered_at": datetime.now(timezone.utc).isoformat()}
+        )
+        db.add(user)
+        await db.commit()
+        await db.refresh(user)
+
+    access_token = create_access_token(user.id)
+    refresh_token = create_refresh_token(user.id)
+
+    # Redirect to frontend callback with tokens in URL params
+    redirect_url = f"{settings.FRONTEND_URL}/auth/callback?access_token={access_token}&refresh_token={refresh_token}"
+    return RedirectResponse(url=redirect_url)
 
 
 # --- Magic Link ---
